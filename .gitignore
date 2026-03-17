@@ -1,11 +1,29 @@
 # 前端项目
-campus-card-web/
-node_modules/
-dist/
+campus-card-web/node_modules/
+campus-card-web/dist/
+
+# 后端项目
+campus-card-server/target/
+campus-card-server/.idea/
 
 # IDE
 .idea/
-.vscode/ç
+.vscode/
 
 # 上传文件
 uploads/
+
+# 系统文件
+.DS_Store
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 构建产物
+build/
+
+# 日志文件
+logs/
+*.log
