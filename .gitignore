@@ -1,0 +1,11 @@
+# 前端项目
+campus-card-web/
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/ç
+
+# 上传文件
+uploads/
