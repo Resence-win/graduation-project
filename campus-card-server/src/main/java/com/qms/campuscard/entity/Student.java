@@ -10,31 +10,46 @@ import lombok.AllArgsConstructor;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-@TableName("admin_user")
+@TableName("student")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class AdminUser implements Serializable {
+public class Student implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @TableField("username")
-    private String username;
+    @TableField("student_no")
+    private String studentNo;
 
-    @TableField("password")
-    private String password;
+    @TableField("name")
+    private String name;
 
-    @TableField("role")
-    private String role;
+    @TableField("gender")
+    private String gender;
+
+    @TableField("college")
+    private String college;
+
+    @TableField("major")
+    private String major;
+
+    @TableField("class_name")
+    private String className;
+
+    @TableField("phone")
+    private String phone;
 
     @TableField("status")
     private Integer status;
 
     @TableField("create_time")
     private LocalDateTime createTime;
+
+    @TableField("update_time")
+    private LocalDateTime updateTime;
 
     @TableField("is_deleted")
     private Integer isDeleted;
