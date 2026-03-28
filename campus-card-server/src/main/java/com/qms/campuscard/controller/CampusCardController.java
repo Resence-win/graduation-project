@@ -92,8 +92,11 @@ public class CampusCardController {
     }
 
     @GetMapping("/account/flow")
-    public Result<List<AccountFlow>> getAccountFlow(@RequestParam Long account_id) {
-        List<AccountFlow> flows = campusCardService.getAccountFlow(account_id);
+    public Result<com.baomidou.mybatisplus.core.metadata.IPage<AccountFlow>> getAccountFlow(
+            @RequestParam Long account_id,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        com.baomidou.mybatisplus.core.metadata.IPage<AccountFlow> flows = campusCardService.getAccountFlow(account_id, page, size);
         return Result.success(flows);
     }
 }

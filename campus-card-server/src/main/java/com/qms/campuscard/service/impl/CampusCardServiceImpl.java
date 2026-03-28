@@ -1,6 +1,7 @@
 package com.qms.campuscard.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.Account;
 import com.qms.campuscard.entity.AccountFlow;
 import com.qms.campuscard.entity.CampusCard;
@@ -195,11 +196,19 @@ public class CampusCardServiceImpl implements CampusCardService {
     }
 
     @Override
-    public List<AccountFlow> getAccountFlow(Long accountId) {
+    public com.baomidou.mybatisplus.core.metadata.IPage<AccountFlow> getAccountFlow(Long accountId, Integer page, Integer size) {
+        if (page == null || page < 1) {
+            page = 1;
+        }
+        if (size == null || size < 1) {
+            size = 10;
+        }
+        
+        Page<AccountFlow> pageParam = new Page<>(page, size);
         QueryWrapper<AccountFlow> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("account_id", accountId);
         queryWrapper.eq("is_deleted", 0);
         queryWrapper.orderByDesc("create_time");
-        return accountFlowMapper.selectList(queryWrapper);
+        return accountFlowMapper.selectPage(pageParam, queryWrapper);
     }
 }

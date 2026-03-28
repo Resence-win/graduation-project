@@ -26,5 +26,5 @@ public interface CampusCardService {
 
     List<CardChangeRecord> getCardOperationRecords(Long cardId);
 
-    List<AccountFlow> getAccountFlow(Long accountId);
+    com.baomidou.mybatisplus.core.metadata.IPage<AccountFlow> getAccountFlow(Long accountId, Integer page, Integer size);
 }
