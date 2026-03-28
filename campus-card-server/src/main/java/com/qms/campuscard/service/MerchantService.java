@@ -27,4 +27,6 @@ public interface MerchantService {
     boolean deleteMerchants(List<Long> ids);
 
     String uploadLogo(MultipartFile file);
+
+    Merchant getMerchantById(Long id);
 }

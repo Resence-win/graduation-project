@@ -22,7 +22,6 @@ import java.util.UUID;
 @Service
 public class MerchantServiceImpl implements MerchantService {
 
-    @Resource
     private MerchantMapper merchantMapper;
 
     @Resource
@@ -133,5 +132,13 @@ public class MerchantServiceImpl implements MerchantService {
         } catch (IOException e) {
             throw new RuntimeException("文件上传失败", e);
         }
+    }
+
+    @Override
+    public Merchant getMerchantById(Long id) {
+        QueryWrapper<Merchant> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id);
+        queryWrapper.eq("is_deleted", 0);
+        return merchantMapper.selectOne(queryWrapper);
     }
 }
