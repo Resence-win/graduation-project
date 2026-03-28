@@ -10,9 +10,14 @@ spring:
     time-zone: Asia/Shanghai
   servlet:
     multipart:
-      max-file-size: 10MB       # 单个文件最大 10MB
-      max-request-size: 20MB    # 整个请求最大 20MB
-      
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+file:
+  upload:
+    path: ./upload
+    url-prefix: /upload 
+
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
