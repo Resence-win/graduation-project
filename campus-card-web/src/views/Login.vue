@@ -107,7 +107,12 @@ const handleLogin = async () => {
     await loginFormRef.value.validate()
     loading.value = true
     
-    const res = await login({ username: loginForm.username, password: loginForm.password })
+    // 将角色信息传递给后端进行验证
+    const res = await login({ 
+      username: loginForm.username, 
+      password: loginForm.password,
+      role: loginForm.role
+    })
     console.log('登录响应:', res)
     
     if (res.code === 0) {

@@ -4,7 +4,6 @@
       <template #header>
         <div class="card-header">
           <span>账户管理</span>
-          <el-button type="primary" @click="handleQuery">查询账户</el-button>
         </div>
       </template>
       
@@ -139,10 +138,6 @@ const handleReset = () => {
   searchForm.cardNo = ''
   tableData.value = []
   pagination.total = 0
-}
-
-const handleQuery = () => {
-  loadData()
 }
 
 const handleViewFlow = async (row) => {

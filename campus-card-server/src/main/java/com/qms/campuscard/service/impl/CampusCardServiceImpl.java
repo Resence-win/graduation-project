@@ -1,17 +1,10 @@
 package com.qms.campuscard.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.qms.campuscard.entity.Account;
-import com.qms.campuscard.entity.AccountFlow;
-import com.qms.campuscard.entity.CampusCard;
-import com.qms.campuscard.entity.CardChangeRecord;
-import com.qms.campuscard.entity.Student;
-import com.qms.campuscard.entity.Teacher;
-import com.qms.campuscard.mapper.AccountFlowMapper;
-import com.qms.campuscard.mapper.AccountMapper;
-import com.qms.campuscard.mapper.CampusCardMapper;
-import com.qms.campuscard.mapper.CardChangeRecordMapper;
+import com.qms.campuscard.entity.*;
+import com.qms.campuscard.mapper.*;
 import com.qms.campuscard.service.CampusCardService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,22 +27,33 @@ public class CampusCardServiceImpl implements CampusCardService {
     private AccountMapper accountMapper;
 
     @Resource
-    private com.qms.campuscard.mapper.StudentMapper studentMapper;
-
-    @Resource
-    private com.qms.campuscard.mapper.TeacherMapper teacherMapper;
+    private AccountFlowMapper accountFlowMapper;
 
     @Resource
     private CardChangeRecordMapper cardChangeRecordMapper;
 
     @Resource
-    private AccountFlowMapper accountFlowMapper;
+    private StudentMapper studentMapper;
 
-    private void recordCardChange(Long cardId, String operationType, Long operatorId, String remark) {
+    @Resource
+    private TeacherMapper teacherMapper;
+
+    private void recordCardChange(Long cardId, String operationType, String oldValue, String newValue) {
         CardChangeRecord record = new CardChangeRecord();
         record.setCardId(cardId);
         record.setOperationType(operationType);
-        record.setOperatorId(operatorId);
+        record.setOperatorId(1L); // 默认为系统操作
+        // 将 oldValue 和 newValue 合并为 remark
+        String remark = "";
+        if (oldValue != null) {
+            remark += "旧值: " + oldValue;
+        }
+        if (newValue != null) {
+            if (!remark.isEmpty()) {
+                remark += ", ";
+            }
+            remark += "新值: " + newValue;
+        }
         record.setRemark(remark);
         record.setIsDeleted(0);
         record.setCreateTime(LocalDateTime.now());
@@ -58,20 +62,40 @@ public class CampusCardServiceImpl implements CampusCardService {
 
     @Override
     @Transactional
-    public CampusCard openCard(Long userId, String userType) {
+    public CampusCard openCard(String userNo, String userType) {
         // 校验用户是否存在
-        if ("student".equals(userType)) {
-            Student student = studentMapper.selectById(userId);
-            if (student == null || student.getIsDeleted() == 1) {
-                throw new RuntimeException("学生不存在");
+        Long userId = null;
+        try {
+            System.out.println("userNo: " + userNo);
+            System.out.println("userType: " + userType);
+            if (userType == null) {
+                throw new RuntimeException("用户类型不能为空");
             }
-        } else if ("teacher".equals(userType)) {
-            Teacher teacher = teacherMapper.selectById(userId);
-            if (teacher == null || teacher.getIsDeleted() == 1) {
-                throw new RuntimeException("教师不存在");
+            if ("student".equals(userType)) {
+                QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
+                studentQueryWrapper.eq("student_no", userNo);
+                studentQueryWrapper.eq("is_deleted", 0);
+                Student student = studentMapper.selectOne(studentQueryWrapper);
+                if (student == null) {
+                    throw new RuntimeException("学生不存在");
+                }
+                userId = student.getId();
+            } else if ("teacher".equals(userType)) {
+                QueryWrapper<Teacher> teacherQueryWrapper = new QueryWrapper<>();
+                teacherQueryWrapper.eq("teacher_no", userNo);
+                teacherQueryWrapper.eq("is_deleted", 0);
+                Teacher teacher = teacherMapper.selectOne(teacherQueryWrapper);
+                if (teacher == null) {
+                    throw new RuntimeException("教师不存在");
+                }
+                userId = teacher.getId();
+            } else {
+                throw new RuntimeException("用户类型错误，只能是student或teacher");
             }
-        } else {
-            throw new RuntimeException("用户类型错误，只能是student或teacher");
+        } catch (Exception e) {
+            System.out.println("开卡异常: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
 
         // 校验是否已开卡（只有注销状态的卡可以重新开卡）
@@ -120,24 +144,129 @@ public class CampusCardServiceImpl implements CampusCardService {
     }
 
     @Override
-    public CampusCard getCardById(Long cardId) {
+    public com.qms.campuscard.dto.CampusCardDTO getCardById(Long cardId) {
         QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("id", cardId);
         queryWrapper.eq("is_deleted", 0);
-        return campusCardMapper.selectOne(queryWrapper);
+        CampusCard campusCard = campusCardMapper.selectOne(queryWrapper);
+        
+        if (campusCard == null) {
+            return null;
+        }
+        
+        // 转换为DTO
+        com.qms.campuscard.dto.CampusCardDTO dto = new com.qms.campuscard.dto.CampusCardDTO();
+        dto.setId(campusCard.getId());
+        dto.setCardNo(campusCard.getCardNo());
+        dto.setUserId(campusCard.getUserId());
+        dto.setUserType(campusCard.getUserType());
+        dto.setStatus(campusCard.getStatus());
+        dto.setIssueDate(campusCard.getIssueDate());
+        dto.setExpireDate(campusCard.getExpireDate());
+        dto.setCreateTime(campusCard.getCreateTime());
+        dto.setUpdateTime(campusCard.getUpdateTime());
+        dto.setIsDeleted(campusCard.getIsDeleted());
+        
+        // 获取用户信息
+        if ("student".equals(campusCard.getUserType())) {
+            Student student = studentMapper.selectById(campusCard.getUserId());
+            if (student != null) {
+                dto.setUserNo(student.getStudentNo());
+                dto.setUserName(student.getName());
+            }
+        } else if ("teacher".equals(campusCard.getUserType())) {
+            Teacher teacher = teacherMapper.selectById(campusCard.getUserId());
+            if (teacher != null) {
+                dto.setUserNo(teacher.getTeacherNo());
+                dto.setUserName(teacher.getName());
+            }
+        }
+        
+        return dto;
+    }
+
+    @Override
+    public com.qms.campuscard.dto.CampusCardDTO getCardByUserNo(String userNo, String userType) {
+        // 首先根据用户类型和编号获取用户ID
+        Long userId = null;
+        if ("student".equals(userType)) {
+            QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
+            studentQueryWrapper.eq("student_no", userNo);
+            studentQueryWrapper.eq("is_deleted", 0);
+            Student student = studentMapper.selectOne(studentQueryWrapper);
+            if (student != null) {
+                userId = student.getId();
+            }
+        } else if ("teacher".equals(userType)) {
+            QueryWrapper<Teacher> teacherQueryWrapper = new QueryWrapper<>();
+            teacherQueryWrapper.eq("teacher_no", userNo);
+            teacherQueryWrapper.eq("is_deleted", 0);
+            Teacher teacher = teacherMapper.selectOne(teacherQueryWrapper);
+            if (teacher != null) {
+                userId = teacher.getId();
+            }
+        }
+        
+        if (userId == null) {
+            return null;
+        }
+        
+        // 根据用户ID和类型查询校园卡
+        QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_id", userId);
+        queryWrapper.eq("user_type", userType);
+        queryWrapper.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(queryWrapper);
+        
+        if (campusCard == null) {
+            return null;
+        }
+        
+        // 转换为DTO
+        com.qms.campuscard.dto.CampusCardDTO dto = new com.qms.campuscard.dto.CampusCardDTO();
+        dto.setId(campusCard.getId());
+        dto.setCardNo(campusCard.getCardNo());
+        dto.setUserId(campusCard.getUserId());
+        dto.setUserType(campusCard.getUserType());
+        dto.setUserNo(userNo);
+        dto.setStatus(campusCard.getStatus());
+        dto.setIssueDate(campusCard.getIssueDate());
+        dto.setExpireDate(campusCard.getExpireDate());
+        dto.setCreateTime(campusCard.getCreateTime());
+        dto.setUpdateTime(campusCard.getUpdateTime());
+        dto.setIsDeleted(campusCard.getIsDeleted());
+        
+        // 获取用户姓名
+        if ("student".equals(userType)) {
+            Student student = studentMapper.selectById(userId);
+            if (student != null) {
+                dto.setUserName(student.getName());
+            }
+        } else if ("teacher".equals(userType)) {
+            Teacher teacher = teacherMapper.selectById(userId);
+            if (teacher != null) {
+                dto.setUserName(teacher.getName());
+            }
+        }
+        
+        return dto;
     }
 
     @Override
     @Transactional
     public boolean lossCard(Long cardId) {
-        CampusCard campusCard = new CampusCard();
-        campusCard.setId(cardId);
-        campusCard.setStatus(2);
+        CampusCard campusCard = campusCardMapper.selectById(cardId);
+        if (campusCard == null || campusCard.getStatus() != 1) {
+            return false;
+        }
+        
+        campusCard.setStatus(2); // 2表示挂失状态
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
+        
         if (success) {
             // 记录挂失操作
-            recordCardChange(cardId, "挂失", null, "校园卡挂失");
+            recordCardChange(cardId, "挂失", "正常", "挂失");
         }
         return success;
     }
@@ -145,14 +274,18 @@ public class CampusCardServiceImpl implements CampusCardService {
     @Override
     @Transactional
     public boolean unlossCard(Long cardId) {
-        CampusCard campusCard = new CampusCard();
-        campusCard.setId(cardId);
-        campusCard.setStatus(1);
+        CampusCard campusCard = campusCardMapper.selectById(cardId);
+        if (campusCard == null || campusCard.getStatus() != 2) {
+            return false;
+        }
+        
+        campusCard.setStatus(1); // 1表示正常状态
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
+        
         if (success) {
             // 记录解挂操作
-            recordCardChange(cardId, "解挂", null, "校园卡解挂");
+            recordCardChange(cardId, "解挂", "挂失", "正常");
         }
         return success;
     }
@@ -160,11 +293,15 @@ public class CampusCardServiceImpl implements CampusCardService {
     @Override
     @Transactional
     public boolean cancelCard(Long cardId) {
-        CampusCard campusCard = new CampusCard();
-        campusCard.setId(cardId);
-        campusCard.setStatus(0);
+        CampusCard campusCard = campusCardMapper.selectById(cardId);
+        if (campusCard == null) {
+            return false;
+        }
+        
+        campusCard.setStatus(0); // 0表示注销状态
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
+        
         if (success) {
             // 记录注销操作
             recordCardChange(cardId, "注销", null, "校园卡注销");
@@ -178,6 +315,65 @@ public class CampusCardServiceImpl implements CampusCardService {
         queryWrapper.eq("card_id", cardId);
         queryWrapper.eq("is_deleted", 0);
         return accountMapper.selectOne(queryWrapper);
+    }
+
+    @Override
+    public Account getAccountByCardNo(String cardNo) {
+        // 首先根据卡号查询校园卡
+        QueryWrapper<CampusCard> cardQueryWrapper = new QueryWrapper<>();
+        cardQueryWrapper.eq("card_no", cardNo);
+        cardQueryWrapper.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(cardQueryWrapper);
+        
+        if (campusCard == null) {
+            return null;
+        }
+        
+        // 根据校园卡ID查询账户
+        return getAccountByCardId(campusCard.getId());
+    }
+
+    @Override
+    public com.qms.campuscard.dto.CampusCardDTO getCardByCardNo(String cardNo) {
+        // 根据卡号查询校园卡
+        QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("card_no", cardNo);
+        queryWrapper.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(queryWrapper);
+        
+        if (campusCard == null) {
+            return null;
+        }
+        
+        // 转换为DTO
+        com.qms.campuscard.dto.CampusCardDTO dto = new com.qms.campuscard.dto.CampusCardDTO();
+        dto.setId(campusCard.getId());
+        dto.setCardNo(campusCard.getCardNo());
+        dto.setUserId(campusCard.getUserId());
+        dto.setUserType(campusCard.getUserType());
+        dto.setStatus(campusCard.getStatus());
+        dto.setIssueDate(campusCard.getIssueDate());
+        dto.setExpireDate(campusCard.getExpireDate());
+        dto.setCreateTime(campusCard.getCreateTime());
+        dto.setUpdateTime(campusCard.getUpdateTime());
+        dto.setIsDeleted(campusCard.getIsDeleted());
+        
+        // 获取用户信息
+        if ("student".equals(campusCard.getUserType())) {
+            Student student = studentMapper.selectById(campusCard.getUserId());
+            if (student != null) {
+                dto.setUserNo(student.getStudentNo());
+                dto.setUserName(student.getName());
+            }
+        } else if ("teacher".equals(campusCard.getUserType())) {
+            Teacher teacher = teacherMapper.selectById(campusCard.getUserId());
+            if (teacher != null) {
+                dto.setUserNo(teacher.getTeacherNo());
+                dto.setUserName(teacher.getName());
+            }
+        }
+        
+        return dto;
     }
 
     @Override
@@ -196,7 +392,7 @@ public class CampusCardServiceImpl implements CampusCardService {
     }
 
     @Override
-    public com.baomidou.mybatisplus.core.metadata.IPage<CampusCard> getCardList(Page<CampusCard> page, String cardNo, Integer status) {
+    public com.baomidou.mybatisplus.core.metadata.IPage<com.qms.campuscard.dto.CampusCardDTO> getCardList(Page<CampusCard> page, String cardNo, Integer status) {
         QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("is_deleted", 0);
         
@@ -208,7 +404,41 @@ public class CampusCardServiceImpl implements CampusCardService {
         }
         
         queryWrapper.orderByDesc("create_time");
-        return campusCardMapper.selectPage(page, queryWrapper);
+        
+        // 查询校园卡列表
+        com.baomidou.mybatisplus.core.metadata.IPage<CampusCard> cardPage = campusCardMapper.selectPage(page, queryWrapper);
+        
+        // 转换为DTO列表
+        return cardPage.convert(campusCard -> {
+            com.qms.campuscard.dto.CampusCardDTO dto = new com.qms.campuscard.dto.CampusCardDTO();
+            dto.setId(campusCard.getId());
+            dto.setCardNo(campusCard.getCardNo());
+            dto.setUserId(campusCard.getUserId());
+            dto.setUserType(campusCard.getUserType());
+            dto.setStatus(campusCard.getStatus());
+            dto.setIssueDate(campusCard.getIssueDate());
+            dto.setExpireDate(campusCard.getExpireDate());
+            dto.setCreateTime(campusCard.getCreateTime());
+            dto.setUpdateTime(campusCard.getUpdateTime());
+            dto.setIsDeleted(campusCard.getIsDeleted());
+            
+            // 获取用户信息
+            if ("student".equals(campusCard.getUserType())) {
+                Student student = studentMapper.selectById(campusCard.getUserId());
+                if (student != null) {
+                    dto.setUserNo(student.getStudentNo());
+                    dto.setUserName(student.getName());
+                }
+            } else if ("teacher".equals(campusCard.getUserType())) {
+                Teacher teacher = teacherMapper.selectById(campusCard.getUserId());
+                if (teacher != null) {
+                    dto.setUserNo(teacher.getTeacherNo());
+                    dto.setUserName(teacher.getName());
+                }
+            }
+            
+            return dto;
+        });
     }
 
     @Override

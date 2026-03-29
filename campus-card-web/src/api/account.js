@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 
-export const getAccount = (cardId) => {
-  return request.get(`/account/${cardId}`)
+export const getAccount = (cardNo) => {
+  return request.get(`/account/by-card-no/${cardNo}`)
 }
 
 export const getBalance = (cardId) => {

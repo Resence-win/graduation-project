@@ -12,6 +12,14 @@ export const getCardInfo = (cardId) => {
   return request.get(`/card/${cardId}`)
 }
 
+export const getCardByUserNo = (userNo, userType) => {
+  return request.get(`/card/by-user-no/${userNo}/${userType}`)
+}
+
+export const getCardByCardNo = (cardNo) => {
+  return request.get(`/card/by-card-no/${cardNo}`)
+}
+
 export const lossCard = (data) => {
   return request.post('/card/loss', data)
 }

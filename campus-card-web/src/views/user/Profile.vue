@@ -119,7 +119,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getStudentByNo } from '@/api/student'
 import { getTeacherByNo } from '@/api/teacher'
-import { getCardInfo } from '@/api/card'
+import { getCardInfo, getCardByUserNo } from '@/api/card'
 import { getConsumeList } from '@/api/consume'
 import { getBorrowList } from '@/api/book'
 
@@ -189,10 +189,14 @@ const loadUserInfo = async () => {
 
 const loadCardInfo = async () => {
   try {
-    // 假设用户信息中有cardId
-    if (userInfo.cardId) {
-      const res = await getCardInfo(userInfo.cardId)
+    // 使用新的接口根据用户编号和类型查询校园卡信息
+    if (userInfo.username && userInfo.role) {
+      const res = await getCardByUserNo(userInfo.username, userInfo.role)
       if (res.code === 0) {
+        // 转换开卡时间格式
+        if (res.data.createTime) {
+          res.data.createTime = new Date(res.data.createTime).toLocaleString()
+        }
         Object.assign(cardInfo, res.data)
       }
     }
@@ -203,9 +207,9 @@ const loadCardInfo = async () => {
 
 const loadConsumeData = async () => {
   try {
-    if (userInfo.cardId) {
+    if (cardInfo.id) {
       const res = await getConsumeList({
-        card_id: userInfo.cardId,
+        card_id: cardInfo.id,
         page: consumePagination.page,
         size: consumePagination.size
       })
@@ -221,9 +225,9 @@ const loadConsumeData = async () => {
 
 const loadBorrowData = async () => {
   try {
-    if (userInfo.cardId) {
+    if (cardInfo.id) {
       const res = await getBorrowList({
-        card_id: userInfo.cardId,
+        card_id: cardInfo.id,
         page: borrowPagination.page,
         size: borrowPagination.size
       })

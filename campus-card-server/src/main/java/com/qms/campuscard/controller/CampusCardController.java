@@ -1,9 +1,9 @@
 package com.qms.campuscard.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
+import com.qms.campuscard.common.LogUtil;
+import com.qms.campuscard.dto.CampusCardDTO;
 import com.qms.campuscard.dto.CardOperationRequest;
 import com.qms.campuscard.dto.OpenCardRequest;
 import com.qms.campuscard.entity.Account;
@@ -13,34 +13,42 @@ import com.qms.campuscard.entity.CardChangeRecord;
 import com.qms.campuscard.service.CampusCardService;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
 public class CampusCardController {
 
     private final CampusCardService campusCardService;
+    private final LogUtil logUtil;
 
-    @Resource
-    private LogUtil logUtil;
-
-    public CampusCardController(CampusCardService campusCardService) {
+    public CampusCardController(CampusCardService campusCardService, LogUtil logUtil) {
         this.campusCardService = campusCardService;
+        this.logUtil = logUtil;
     }
 
     @PostMapping("/card/open")
     public Result<CampusCard> openCard(@RequestBody OpenCardRequest request) {
-        CampusCard campusCard = campusCardService.openCard(request.getUserId(), request.getUserType());
-        // 记录日志
-        logUtil.recordLog(1L, "新增", "campus_card", campusCard.getId(), "开卡成功，卡号：" + campusCard.getCardNo());
-        return Result.success("开卡成功", campusCard);
+        try {
+            String userNo = request.getUserNo();
+            String userType = request.getUserType();
+            
+            CampusCard campusCard = campusCardService.openCard(userNo, userType);
+            // 记录日志
+            logUtil.recordLog(1L, "开卡", "campus_card", campusCard.getId(), "开卡成功：" + campusCard.getCardNo());
+            return Result.success("开卡成功", campusCard);
+        } catch (Exception e) {
+            // 记录日志
+            logUtil.recordLog(1L, "开卡", "campus_card", null, "开卡失败：" + e.getMessage());
+            return Result.error("开卡失败：" + e.getMessage());
+        }
     }
 
     @GetMapping("/card/{cardId}")
-    public Result<CampusCard> getCardById(@PathVariable Long cardId) {
-        CampusCard campusCard = campusCardService.getCardById(cardId);
+    public Result<CampusCardDTO> getCardById(@PathVariable Long cardId) {
+        CampusCardDTO campusCard = campusCardService.getCardById(cardId);
         if (campusCard != null) {
             // 记录日志
             logUtil.recordLog(1L, "查询", "campus_card", cardId, "查询校园卡：" + campusCard.getCardNo());
@@ -50,9 +58,33 @@ public class CampusCardController {
         }
     }
 
+    @GetMapping("/card/by-user-no/{userNo}/{userType}")
+    public Result<CampusCardDTO> getCardByUserNo(@PathVariable String userNo, @PathVariable String userType) {
+        CampusCardDTO campusCard = campusCardService.getCardByUserNo(userNo, userType);
+        if (campusCard != null) {
+            // 记录日志
+            logUtil.recordLog(1L, "查询", "campus_card", null, "根据用户编号查询校园卡：" + userNo);
+            return Result.success(campusCard);
+        } else {
+            return Result.error("校园卡不存在");
+        }
+    }
+
+    @GetMapping("/card/by-card-no/{cardNo}")
+    public Result<CampusCardDTO> getCardByCardNo(@PathVariable String cardNo) {
+        CampusCardDTO campusCard = campusCardService.getCardByCardNo(cardNo);
+        if (campusCard != null) {
+            // 记录日志
+            logUtil.recordLog(1L, "查询", "campus_card", campusCard.getId(), "根据卡号查询校园卡：" + cardNo);
+            return Result.success(campusCard);
+        } else {
+            return Result.error("校园卡不存在");
+        }
+    }
+
     @PostMapping("/card/loss")
     public Result<Boolean> lossCard(@RequestBody CardOperationRequest request) {
-        CampusCard campusCard = campusCardService.getCardById(request.getCardId());
+        CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
         boolean success = campusCardService.lossCard(request.getCardId());
         if (success) {
             // 记录日志
@@ -65,7 +97,7 @@ public class CampusCardController {
 
     @PostMapping("/card/unloss")
     public Result<Boolean> unlossCard(@RequestBody CardOperationRequest request) {
-        CampusCard campusCard = campusCardService.getCardById(request.getCardId());
+        CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
         boolean success = campusCardService.unlossCard(request.getCardId());
         if (success) {
             // 记录日志
@@ -78,7 +110,7 @@ public class CampusCardController {
 
     @PostMapping("/card/cancel")
     public Result<Boolean> cancelCard(@RequestBody CardOperationRequest request) {
-        CampusCard campusCard = campusCardService.getCardById(request.getCardId());
+        CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
         boolean success = campusCardService.cancelCard(request.getCardId());
         if (success) {
             // 记录日志
@@ -95,6 +127,18 @@ public class CampusCardController {
         if (account != null) {
             // 记录日志
             logUtil.recordLog(1L, "查询", "account", account.getId(), "查询账户信息");
+            return Result.success(account);
+        } else {
+            return Result.error("账户不存在");
+        }
+    }
+
+    @GetMapping("/account/by-card-no/{cardNo}")
+    public Result<Account> getAccountByCardNo(@PathVariable String cardNo) {
+        Account account = campusCardService.getAccountByCardNo(cardNo);
+        if (account != null) {
+            // 记录日志
+            logUtil.recordLog(1L, "查询", "account", account.getId(), "根据卡号查询账户信息：" + cardNo);
             return Result.success(account);
         } else {
             return Result.error("账户不存在");
@@ -118,13 +162,13 @@ public class CampusCardController {
     }
 
     @GetMapping("/card/list")
-    public Result<IPage<CampusCard>> getCardList(
+    public Result<com.baomidou.mybatisplus.core.metadata.IPage<CampusCardDTO>> getCardList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String cardNo,
             @RequestParam(required = false) Integer status) {
-        Page<CampusCard> pageParam = new Page<>(page, size);
-        IPage<CampusCard> cardPage = campusCardService.getCardList(pageParam, cardNo, status);
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<com.qms.campuscard.entity.CampusCard> pageParam = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+        com.baomidou.mybatisplus.core.metadata.IPage<CampusCardDTO> cardPage = campusCardService.getCardList(pageParam, cardNo, status);
         // 记录日志
         logUtil.recordLog(1L, "查询", "campus_card", null, "查询校园卡列表");
         return Result.success(cardPage);

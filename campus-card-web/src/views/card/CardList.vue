@@ -28,7 +28,8 @@
       <el-table :data="tableData" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="cardNo" label="卡号" width="150" />
-        <el-table-column prop="userId" label="用户ID" width="100" />
+        <el-table-column prop="userNo" label="学号/教师编号" width="150" />
+        <el-table-column prop="userName" label="姓名" width="120" />
         <el-table-column prop="userType" label="用户类型" width="100">
           <template #default="{ row }">
             <el-tag :type="row.userType === 'student' ? 'primary' : 'success'">
@@ -94,8 +95,8 @@
       width="500px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="用户ID" prop="userId">
-          <el-input v-model="form.userId" placeholder="请输入用户ID" />
+        <el-form-item label="学号/教师编号" prop="userNo">
+          <el-input v-model="form.userNo" placeholder="请输入学号或教师编号" />
         </el-form-item>
         <el-form-item label="用户类型" prop="userType">
           <el-select v-model="form.userType" placeholder="请选择用户类型" style="width: 100%">
@@ -133,13 +134,13 @@ const pagination = reactive({
 })
 
 const form = reactive({
-  userId: null,
+  userNo: '',
   userType: 'student'
 })
 
 const rules = {
-  userId: [
-    { required: true, message: '请输入用户ID', trigger: 'blur' }
+  userNo: [
+    { required: true, message: '请输入学号或教师编号', trigger: 'blur' }
   ],
   userType: [
     { required: true, message: '请选择用户类型', trigger: 'change' }
@@ -194,7 +195,7 @@ const handleReset = () => {
 const handleOpen = () => {
   dialogVisible.value = true
   Object.assign(form, {
-    userId: null,
+    userNo: '',
     userType: 'student'
   })
 }
@@ -206,7 +207,8 @@ const handleView = async (row) => {
       ElMessageBox.alert(`
         <div style="text-align: left;">
           <p><strong>卡号：</strong>${res.data.cardNo}</p>
-          <p><strong>用户ID：</strong>${res.data.userId}</p>
+          <p><strong>用户编号：</strong>${res.data.userNo}</p>
+          <p><strong>用户姓名：</strong>${res.data.userName}</p>
           <p><strong>用户类型：</strong>${res.data.userType === 'student' ? '学生' : '教师'}</p>
           <p><strong>状态：</strong>${getStatusText(res.data.status)}</p>
           <p><strong>发卡日期：</strong>${res.data.issueDate}</p>
@@ -286,7 +288,17 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     
-    const res = await openCard(form)
+    // 转换参数名，与后端保持一致
+    const requestData = {
+      user_no: form.userNo,
+      user_type: form.userType
+    }
+    
+    console.log('开卡请求参数:', requestData)
+    
+    const res = await openCard(requestData)
+    console.log('开卡响应:', res)
+    
     if (res.code === 0) {
       ElMessage.success('开卡成功')
       dialogVisible.value = false
