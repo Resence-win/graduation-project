@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
+import com.qms.campuscard.dto.TeacherRequest;
 import com.qms.campuscard.entity.Teacher;
 import com.qms.campuscard.service.TeacherService;
 import org.springframework.web.bind.annotation.*;
@@ -24,11 +25,11 @@ public class TeacherController {
     }
 
     @PostMapping
-    public Result<Boolean> addTeacher(@RequestBody Teacher teacher) {
-        boolean success = teacherService.addTeacher(teacher);
+    public Result<Boolean> addTeacher(@RequestBody TeacherRequest teacherRequest) {
+        boolean success = teacherService.addTeacher(teacherRequest);
         if (success) {
             // 记录日志
-            logUtil.recordLog(1L, "新增", "teacher", teacher.getId(), "新增教师：" + teacher.getName());
+            logUtil.recordLog(1L, "新增", "teacher", null, "新增教师：" + teacherRequest.getName());
             return Result.success("添加成功", true);
         } else {
             return Result.error("添加失败");
@@ -54,6 +55,18 @@ public class TeacherController {
         if (teacher != null) {
             // 记录日志
             logUtil.recordLog(1L, "查询", "teacher", id, "查询教师详情：" + teacher.getName());
+            return Result.success(teacher);
+        } else {
+            return Result.error("教师不存在");
+        }
+    }
+    
+    @GetMapping("/by-no/{teacherNo}")
+    public Result<Teacher> getTeacherByTeacherNo(@PathVariable String teacherNo) {
+        Teacher teacher = teacherService.getTeacherByTeacherNo(teacherNo);
+        if (teacher != null) {
+            // 记录日志
+            logUtil.recordLog(1L, "查询", "teacher", null, "根据教师编号查询教师详情：" + teacher.getName());
             return Result.success(teacher);
         } else {
             return Result.error("教师不存在");

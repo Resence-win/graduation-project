@@ -8,6 +8,10 @@ export const getStudentDetail = (id) => {
   return request.get(`/student/${id}`)
 }
 
+export const getStudentByNo = (studentNo) => {
+  return request.get(`/student/by-no/${studentNo}`)
+}
+
 export const addStudent = (data) => {
   return request.post('/student', data)
 }

@@ -8,6 +8,10 @@ export const getTeacherDetail = (id) => {
   return request.get(`/teacher/${id}`)
 }
 
+export const getTeacherByNo = (teacherNo) => {
+  return request.get(`/teacher/by-no/${teacherNo}`)
+}
+
 export const addTeacher = (data) => {
   return request.post('/teacher', data)
 }

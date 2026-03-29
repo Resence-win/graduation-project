@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <h2>校园一卡通管理系统</h2>
-          <p>管理员登录</p>
+          <p>{{ loginForm.role === 'admin' ? '管理员登录' : loginForm.role === 'student' ? '学生登录' : '教师登录' }}</p>
         </div>
       </template>
       
@@ -14,6 +14,14 @@
         :rules="loginRules"
         label-width="80px"
       >
+        <el-form-item label="角色" prop="role">
+          <el-select v-model="loginForm.role" placeholder="请选择角色" class="w-full">
+            <el-option label="管理员" value="admin" />
+            <el-option label="学生" value="student" />
+            <el-option label="教师" value="teacher" />
+          </el-select>
+        </el-form-item>
+        
         <el-form-item label="用户名" prop="username">
           <el-input
             v-model="loginForm.username"
@@ -49,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login } from '@/api/auth'
@@ -59,11 +67,15 @@ const loginFormRef = ref(null)
 const loading = ref(false)
 
 const loginForm = reactive({
+  role: 'admin',
   username: 'admin',
   password: '123456'
 })
 
 const loginRules = {
+  role: [
+    { required: true, message: '请选择角色', trigger: 'change' }
+  ],
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' }
   ],
@@ -73,18 +85,58 @@ const loginRules = {
   ]
 }
 
+// 监听角色变化，更新默认用户名和密码
+watch(
+  () => loginForm.role,
+  (newRole) => {
+    if (newRole === 'admin') {
+      loginForm.username = 'admin'
+      loginForm.password = '123456'
+    } else if (newRole === 'student') {
+      loginForm.username = '2021001'
+      loginForm.password = '123456'
+    } else if (newRole === 'teacher') {
+      loginForm.username = 'T001'
+      loginForm.password = '123456'
+    }
+  }
+)
+
 const handleLogin = async () => {
   try {
     await loginFormRef.value.validate()
     loading.value = true
     
-    const res = await login(loginForm)
+    const res = await login({ username: loginForm.username, password: loginForm.password })
+    console.log('登录响应:', res)
     
     if (res.code === 0) {
+      const userInfo = {
+        ...res.data,
+        role: loginForm.role
+      }
+      console.log('用户信息:', userInfo)
       localStorage.setItem('token', 'mock-token-' + Date.now())
-      localStorage.setItem('user', JSON.stringify(res.data))
+      localStorage.setItem('user', JSON.stringify(userInfo))
       ElMessage.success('登录成功')
-      router.push('/')
+      
+      // 根据角色跳转到不同页面
+      console.log('角色:', loginForm.role)
+      console.log('跳转路径:', loginForm.role === 'admin' ? '/' : '/user/profile')
+      try {
+        if (loginForm.role === 'admin') {
+          console.log('准备跳转到首页')
+          router.push('/')
+          console.log('跳转完成')
+        } else {
+          console.log('准备跳转到个人中心')
+          router.push('/user/profile')
+          console.log('跳转完成')
+        }
+      } catch (error) {
+        console.error('跳转失败:', error)
+        ElMessage.error('跳转失败，请刷新页面重试')
+      }
     } else {
       ElMessage.error(res.msg || '登录失败')
     }

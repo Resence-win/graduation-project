@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
+import com.qms.campuscard.dto.StudentRequest;
 import com.qms.campuscard.entity.Student;
 import com.qms.campuscard.service.StudentService;
 import org.springframework.web.bind.annotation.*;
@@ -24,11 +25,11 @@ public class StudentController {
     }
 
     @PostMapping
-    public Result<Boolean> addStudent(@RequestBody Student student) {
-        boolean success = studentService.addStudent(student);
+    public Result<Boolean> addStudent(@RequestBody StudentRequest studentRequest) {
+        boolean success = studentService.addStudent(studentRequest);
         if (success) {
             // 记录日志
-            logUtil.recordLog(1L, "新增", "student", student.getId(), "新增学生：" + student.getName());
+            logUtil.recordLog(1L, "新增", "student", null, "新增学生：" + studentRequest.getName());
             return Result.success("添加成功", true);
         } else {
             return Result.error("添加失败");
@@ -54,6 +55,18 @@ public class StudentController {
         if (student != null) {
             // 记录日志
             logUtil.recordLog(1L, "查询", "student", id, "查询学生详情：" + student.getName());
+            return Result.success(student);
+        } else {
+            return Result.error("学生不存在");
+        }
+    }
+    
+    @GetMapping("/by-no/{studentNo}")
+    public Result<Student> getStudentByStudentNo(@PathVariable String studentNo) {
+        Student student = studentService.getStudentByStudentNo(studentNo);
+        if (student != null) {
+            // 记录日志
+            logUtil.recordLog(1L, "查询", "student", null, "根据学号查询学生详情：" + student.getName());
             return Result.success(student);
         } else {
             return Result.error("学生不存在");

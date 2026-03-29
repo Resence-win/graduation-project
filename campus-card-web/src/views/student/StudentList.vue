@@ -87,6 +87,9 @@
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="form.phone" placeholder="请输入手机号" />
         </el-form-item>
+        <el-form-item label="密码" prop="password" v-if="!form.id">
+          <el-input v-model="form.password" type="password" placeholder="请输入密码" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -125,7 +128,8 @@ const form = reactive({
   college: '',
   major: '',
   className: '',
-  phone: ''
+  phone: '',
+  password: ''
 })
 
 const rules = {
@@ -149,6 +153,10 @@ const rules = {
   ],
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
   ]
 }
 
@@ -190,7 +198,8 @@ const handleAdd = () => {
     college: '',
     major: '',
     className: '',
-    phone: ''
+    phone: '',
+    password: ''
   })
 }
 
