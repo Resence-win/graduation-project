@@ -37,13 +37,13 @@ public class ConsumeController {
 
     @GetMapping("/list")
     public Result<IPage<ConsumeRecord>> getConsumeRecords(
-            @RequestParam Long card_id,
+            @RequestParam(required = false) Long card_id,
             @RequestParam(required = false) Long merchant_id,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         IPage<ConsumeRecord> records = consumeService.getConsumeRecords(card_id, merchant_id, page, size);
         // 记录日志
-        logUtil.recordLog(1L, "查询", "consume_record", null, "查询消费记录，卡号：" + card_id);
+        logUtil.recordLog(1L, "查询", "consume_record", null, "查询消费记录，卡号：" + (card_id != null ? card_id : "全部") + "，商户：" + (merchant_id != null ? merchant_id : "全部"));
         return Result.success(records);
     }
 }

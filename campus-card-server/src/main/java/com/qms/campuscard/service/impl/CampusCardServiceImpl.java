@@ -196,6 +196,22 @@ public class CampusCardServiceImpl implements CampusCardService {
     }
 
     @Override
+    public com.baomidou.mybatisplus.core.metadata.IPage<CampusCard> getCardList(Page<CampusCard> page, String cardNo, Integer status) {
+        QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("is_deleted", 0);
+        
+        if (cardNo != null && !cardNo.isEmpty()) {
+            queryWrapper.like("card_no", cardNo);
+        }
+        if (status != null) {
+            queryWrapper.eq("status", status);
+        }
+        
+        queryWrapper.orderByDesc("create_time");
+        return campusCardMapper.selectPage(page, queryWrapper);
+    }
+
+    @Override
     public com.baomidou.mybatisplus.core.metadata.IPage<AccountFlow> getAccountFlow(Long accountId, Integer page, Integer size) {
         if (page == null || page < 1) {
             page = 1;

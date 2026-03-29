@@ -37,12 +37,12 @@ public class RechargeController {
 
     @GetMapping("/list")
     public Result<IPage<RechargeRecord>> getRechargeRecords(
-            @RequestParam Long card_id,
+            @RequestParam(required = false) Long card_id,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         IPage<RechargeRecord> records = rechargeService.getRechargeRecords(card_id, page, size);
         // 记录日志
-        logUtil.recordLog(1L, "查询", "recharge_record", null, "查询充值记录，卡号：" + card_id);
+        logUtil.recordLog(1L, "查询", "recharge_record", null, "查询充值记录，卡号：" + (card_id != null ? card_id : "全部"));
         return Result.success(records);
     }
 }

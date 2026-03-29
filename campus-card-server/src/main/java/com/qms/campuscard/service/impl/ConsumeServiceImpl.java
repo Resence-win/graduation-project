@@ -88,23 +88,29 @@ public class ConsumeServiceImpl implements ConsumeService {
             size = 10;
         }
         
-        // 查找账户
-        QueryWrapper<Account> accountQuery = new QueryWrapper<>();
-        accountQuery.eq("card_id", cardId);
-        accountQuery.eq("is_deleted", 0);
-        Account account = accountMapper.selectOne(accountQuery);
-        if (account == null) {
-            return new Page<>(page, size);
-        }
-
         // 查找消费记录
         Page<ConsumeRecord> pageParam = new Page<>(page, size);
         QueryWrapper<ConsumeRecord> consumeQuery = new QueryWrapper<>();
-        consumeQuery.eq("account_id", account.getId());
+        consumeQuery.eq("is_deleted", 0);
+        
+        if (cardId != null) {
+            // 查找账户
+            QueryWrapper<Account> accountQuery = new QueryWrapper<>();
+            accountQuery.eq("card_id", cardId);
+            accountQuery.eq("is_deleted", 0);
+            Account account = accountMapper.selectOne(accountQuery);
+            if (account != null) {
+                consumeQuery.eq("account_id", account.getId());
+            } else {
+                // 账户不存在，返回空页
+                return new Page<>(page, size);
+            }
+        }
+        
         if (merchantId != null) {
             consumeQuery.eq("merchant_id", merchantId);
         }
-        consumeQuery.eq("is_deleted", 0);
+        
         consumeQuery.orderByDesc("consume_time");
         return consumeRecordMapper.selectPage(pageParam, consumeQuery);
     }

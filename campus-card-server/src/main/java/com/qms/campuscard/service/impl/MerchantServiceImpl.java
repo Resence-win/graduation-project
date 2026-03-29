@@ -22,6 +22,7 @@ import java.util.UUID;
 @Service
 public class MerchantServiceImpl implements MerchantService {
 
+    @Resource
     private MerchantMapper merchantMapper;
 
     @Resource

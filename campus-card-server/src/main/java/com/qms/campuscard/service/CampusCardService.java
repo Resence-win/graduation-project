@@ -1,5 +1,7 @@
 package com.qms.campuscard.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.Account;
 import com.qms.campuscard.entity.AccountFlow;
 import com.qms.campuscard.entity.CampusCard;
@@ -14,6 +16,8 @@ public interface CampusCardService {
 
     CampusCard getCardById(Long cardId);
 
+    IPage<CampusCard> getCardList(Page<CampusCard> page, String cardNo, Integer status);
+
     boolean lossCard(Long cardId);
 
     boolean unlossCard(Long cardId);
@@ -26,5 +30,5 @@ public interface CampusCardService {
 
     List<CardChangeRecord> getCardOperationRecords(Long cardId);
 
-    com.baomidou.mybatisplus.core.metadata.IPage<AccountFlow> getAccountFlow(Long accountId, Integer page, Integer size);
+    IPage<AccountFlow> getAccountFlow(Long accountId, Integer page, Integer size);
 }

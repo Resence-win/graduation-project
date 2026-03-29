@@ -80,20 +80,25 @@ public class RechargeServiceImpl implements RechargeService {
             size = 10;
         }
         
-        // 查找账户
-        QueryWrapper<Account> accountQuery = new QueryWrapper<>();
-        accountQuery.eq("card_id", cardId);
-        accountQuery.eq("is_deleted", 0);
-        Account account = accountMapper.selectOne(accountQuery);
-        if (account == null) {
-            return new Page<>(page, size);
-        }
-
         // 查找充值记录
         Page<RechargeRecord> pageParam = new Page<>(page, size);
         QueryWrapper<RechargeRecord> rechargeQuery = new QueryWrapper<>();
-        rechargeQuery.eq("account_id", account.getId());
         rechargeQuery.eq("is_deleted", 0);
+        
+        if (cardId != null) {
+            // 查找账户
+            QueryWrapper<Account> accountQuery = new QueryWrapper<>();
+            accountQuery.eq("card_id", cardId);
+            accountQuery.eq("is_deleted", 0);
+            Account account = accountMapper.selectOne(accountQuery);
+            if (account != null) {
+                rechargeQuery.eq("account_id", account.getId());
+            } else {
+                // 账户不存在，返回空页
+                return new Page<>(page, size);
+            }
+        }
+        
         rechargeQuery.orderByDesc("create_time");
         return rechargeRecordMapper.selectPage(pageParam, rechargeQuery);
     }

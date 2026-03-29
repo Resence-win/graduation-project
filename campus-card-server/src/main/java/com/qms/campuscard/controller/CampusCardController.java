@@ -1,6 +1,7 @@
 package com.qms.campuscard.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
 import com.qms.campuscard.dto.CardOperationRequest;
@@ -114,6 +115,19 @@ public class CampusCardController {
         // 记录日志
         logUtil.recordLog(1L, "查询", "card_change_record", null, "查询校园卡操作记录");
         return Result.success(records);
+    }
+
+    @GetMapping("/card/list")
+    public Result<IPage<CampusCard>> getCardList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String cardNo,
+            @RequestParam(required = false) Integer status) {
+        Page<CampusCard> pageParam = new Page<>(page, size);
+        IPage<CampusCard> cardPage = campusCardService.getCardList(pageParam, cardNo, status);
+        // 记录日志
+        logUtil.recordLog(1L, "查询", "campus_card", null, "查询校园卡列表");
+        return Result.success(cardPage);
     }
 
     @GetMapping("/account/flow")

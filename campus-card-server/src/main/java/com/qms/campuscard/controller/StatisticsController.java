@@ -22,33 +22,33 @@ public class StatisticsController {
 
     @GetMapping("/api/stat/consume")
     public Result<List<Map<String, Object>>> getConsumeStatistics(
-            @RequestParam String start_date,
-            @RequestParam String end_date) {
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date) {
         List<Map<String, Object>> data = statisticsService.getConsumeStatistics(start_date, end_date);
         // 记录日志
-        logUtil.recordLog(1L, "查询", "statistics", null, "查询消费统计，时间范围：" + start_date + " 至 " + end_date);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询消费统计，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
         return Result.success(data);
     }
 
     @GetMapping("/api/stat/user-rank")
     public Result<List<Map<String, Object>>> getUserRank(
-            @RequestParam String start_date,
-            @RequestParam String end_date,
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
         List<Map<String, Object>> data = statisticsService.getUserRank(start_date, end_date, limit);
         // 记录日志
-        logUtil.recordLog(1L, "查询", "statistics", null, "查询用户消费排行，时间范围：" + start_date + " 至 " + end_date);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询用户消费排行，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
         return Result.success(data);
     }
 
     @GetMapping("/api/stat/merchant-rank")
     public Result<List<Map<String, Object>>> getMerchantRank(
-            @RequestParam String start_date,
-            @RequestParam String end_date,
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
         List<Map<String, Object>> data = statisticsService.getMerchantRank(start_date, end_date, limit);
         // 记录日志
-        logUtil.recordLog(1L, "查询", "statistics", null, "查询商户消费排行，时间范围：" + start_date + " 至 " + end_date);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询商户消费排行，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
         return Result.success(data);
     }
 }
