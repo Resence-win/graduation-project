@@ -71,13 +71,13 @@ public class MerchantController {
     }
 
     @GetMapping("/list")
-    public Result<IPage<Merchant>> getMerchantList(
+    public Result<IPage<com.qms.campuscard.dto.MerchantDTO>> getMerchantList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String merchantName,
             @RequestParam(required = false) Long typeId) {
         Page<Merchant> pageParam = new Page<>(page, size);
-        IPage<Merchant> merchantPage = merchantService.getMerchantList(pageParam, merchantName, typeId);
+        IPage<com.qms.campuscard.dto.MerchantDTO> merchantPage = merchantService.getMerchantList(pageParam, merchantName, typeId);
         // 记录日志
         logUtil.recordLog(1L, "查询", "merchant", null, "查询商户列表");
         return Result.success(merchantPage);
@@ -121,11 +121,11 @@ public class MerchantController {
     }
 
     @PostMapping("/upload-logo")
-    public Result<String> uploadLogo(@RequestParam("file") MultipartFile file) {
+    public Result<String> uploadLogo(@RequestParam("file") MultipartFile file, @RequestParam("merchant_id") Long merchantId) {
         try {
-            String url = merchantService.uploadLogo(file);
+            String url = merchantService.uploadLogo(file, merchantId);
             // 记录日志
-            logUtil.recordLog(1L, "上传", "merchant", null, "上传商户Logo");
+            logUtil.recordLog(1L, "上传", "merchant", merchantId, "上传商户Logo");
             return Result.success("上传成功", url);
         } catch (Exception e) {
             return Result.error("上传失败：" + e.getMessage());

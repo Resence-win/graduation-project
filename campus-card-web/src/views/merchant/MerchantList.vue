@@ -40,9 +40,9 @@
           <template #default="{ row }">
             <el-image
               v-if="row.logo"
-              :src="row.logo"
+              :src="'/api' + row.logo"
               style="width: 50px; height: 50px"
-              :preview-src-list="[row.logo]"
+              :preview-src-list="['/api' + row.logo]"
             />
             <span v-else>-</span>
           </template>

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.Merchant;
 import com.qms.campuscard.entity.MerchantType;
+import com.qms.campuscard.dto.MerchantDTO;
 import com.qms.campuscard.mapper.MerchantMapper;
 import com.qms.campuscard.mapper.MerchantTypeMapper;
 import com.qms.campuscard.service.MerchantService;
@@ -65,7 +66,7 @@ public class MerchantServiceImpl implements MerchantService {
     }
 
     @Override
-    public IPage<Merchant> getMerchantList(Page<Merchant> page, String merchantName, Long typeId) {
+    public IPage<MerchantDTO> getMerchantList(Page<Merchant> page, String merchantName, Long typeId) {
         QueryWrapper<Merchant> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("is_deleted", 0);
         
@@ -77,7 +78,34 @@ public class MerchantServiceImpl implements MerchantService {
         }
         
         queryWrapper.orderByDesc("create_time");
-        return merchantMapper.selectPage(page, queryWrapper);
+        IPage<Merchant> merchantPage = merchantMapper.selectPage(page, queryWrapper);
+        
+        // 转换为DTO并添加类型名称
+        return merchantPage.convert(merchant -> {
+            MerchantDTO dto = new MerchantDTO();
+            dto.setId(merchant.getId());
+            dto.setMerchantName(merchant.getMerchantName());
+            dto.setTypeId(merchant.getTypeId());
+            dto.setLocation(merchant.getLocation());
+            dto.setLogo(merchant.getLogo());
+            dto.setStatus(merchant.getStatus());
+            dto.setCreateTime(merchant.getCreateTime());
+            dto.setUpdateTime(merchant.getUpdateTime());
+            dto.setIsDeleted(merchant.getIsDeleted());
+            
+            // 获取商户类型名称
+            if (merchant.getTypeId() != null) {
+                QueryWrapper<MerchantType> typeQuery = new QueryWrapper<>();
+                typeQuery.eq("id", merchant.getTypeId());
+                typeQuery.eq("is_deleted", 0);
+                MerchantType merchantType = merchantTypeMapper.selectOne(typeQuery);
+                if (merchantType != null) {
+                    dto.setTypeName(merchantType.getTypeName());
+                }
+            }
+            
+            return dto;
+        });
     }
 
     @Override
@@ -107,7 +135,7 @@ public class MerchantServiceImpl implements MerchantService {
     }
 
     @Override
-    public String uploadLogo(MultipartFile file) {
+    public String uploadLogo(MultipartFile file, Long merchantId) {
         if (file.isEmpty()) {
             throw new RuntimeException("文件不能为空");
         }
@@ -117,9 +145,8 @@ public class MerchantServiceImpl implements MerchantService {
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             String newFilename = UUID.randomUUID().toString() + extension;
 
-            // 获取项目根目录的绝对路径
-            String projectPath = System.getProperty("user.dir");
-            String absoluteUploadPath = projectPath + File.separator + uploadPath.replace("./", "");
+            // 直接使用项目根目录下的upload目录
+            String absoluteUploadPath = System.getProperty("user.dir") + File.separator + "upload";
 
             File uploadDir = new File(absoluteUploadPath);
             if (!uploadDir.exists()) {
@@ -129,7 +156,17 @@ public class MerchantServiceImpl implements MerchantService {
             File destFile = new File(uploadDir, newFilename);
             file.transferTo(destFile);
 
-            return urlPrefix + "/" + newFilename;
+            String url = urlPrefix + "/" + newFilename;
+
+            // 更新商户的logo字段
+            Merchant merchant = getMerchantById(merchantId);
+            if (merchant != null) {
+                merchant.setLogo(url);
+                merchant.setUpdateTime(LocalDateTime.now());
+                merchantMapper.updateById(merchant);
+            }
+
+            return url;
         } catch (IOException e) {
             throw new RuntimeException("文件上传失败", e);
         }

@@ -18,7 +18,7 @@ public interface MerchantService {
 
     boolean addMerchant(Merchant merchant);
 
-    IPage<Merchant> getMerchantList(Page<Merchant> page, String merchantName, Long typeId);
+    IPage<com.qms.campuscard.dto.MerchantDTO> getMerchantList(Page<Merchant> page, String merchantName, Long typeId);
 
     boolean updateMerchant(Merchant merchant);
 
@@ -26,7 +26,7 @@ public interface MerchantService {
 
     boolean deleteMerchants(List<Long> ids);
 
-    String uploadLogo(MultipartFile file);
+    String uploadLogo(MultipartFile file, Long merchantId);
 
     Merchant getMerchantById(Long id);
 }
