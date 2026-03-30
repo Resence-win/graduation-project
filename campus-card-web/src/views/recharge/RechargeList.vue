@@ -20,7 +20,7 @@
       
       <el-table :data="tableData" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="accountId" label="账户ID" width="100" />
+        <el-table-column prop="cardNo" label="账户卡号" width="180" />
         <el-table-column prop="amount" label="充值金额" width="120">
           <template #default="{ row }">
             <span style="color: #67C23A; font-weight: bold">+¥{{ row.amount }}</span>
@@ -49,8 +49,8 @@
       width="500px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="卡号" prop="cardId">
-          <el-input v-model="form.cardId" placeholder="请输入卡号" />
+        <el-form-item label="卡号" prop="cardNo">
+          <el-input v-model="form.cardNo" placeholder="请输入卡号" />
         </el-form-item>
         <el-form-item label="充值金额" prop="amount">
           <el-input-number v-model="form.amount" :min="0.01" :max="10000" :precision="2" style="width: 100%" />
@@ -75,7 +75,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getRechargeList, recharge } from '@/api/recharge'
+import { getRechargeList, rechargeByCardNo } from '@/api/recharge'
 
 const formRef = ref(null)
 const dialogVisible = ref(false)
@@ -92,13 +92,13 @@ const pagination = reactive({
 })
 
 const form = reactive({
-  cardId: null,
+  cardNo: null,
   amount: 100,
   rechargeType: '现金'
 })
 
 const rules = {
-  cardId: [
+  cardNo: [
     { required: true, message: '请输入卡号', trigger: 'blur' }
   ],
   amount: [
@@ -138,7 +138,7 @@ const handleReset = () => {
 const handleRecharge = () => {
   dialogVisible.value = true
   Object.assign(form, {
-    cardId: null,
+    cardNo: null,
     amount: 100,
     rechargeType: '现金'
   })
@@ -148,7 +148,7 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     
-    const res = await recharge(form)
+    const res = await rechargeByCardNo(form)
     if (res.code === 0) {
       ElMessage.success('充值成功')
       dialogVisible.value = false

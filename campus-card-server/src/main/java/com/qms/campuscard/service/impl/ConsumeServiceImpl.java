@@ -5,10 +5,15 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.Account;
 import com.qms.campuscard.entity.AccountFlow;
+import com.qms.campuscard.entity.CampusCard;
 import com.qms.campuscard.entity.ConsumeRecord;
+import com.qms.campuscard.entity.Merchant;
+import com.qms.campuscard.dto.ConsumeRecordDTO;
 import com.qms.campuscard.mapper.AccountFlowMapper;
 import com.qms.campuscard.mapper.AccountMapper;
+import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.ConsumeRecordMapper;
+import com.qms.campuscard.mapper.MerchantMapper;
 import com.qms.campuscard.service.ConsumeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,9 +36,30 @@ public class ConsumeServiceImpl implements ConsumeService {
     @Resource
     private AccountFlowMapper accountFlowMapper;
 
+    @Resource
+    private CampusCardMapper campusCardMapper;
+
+    @Resource
+    private MerchantMapper merchantMapper;
+
     @Override
     @Transactional
     public boolean consume(Long cardId, Long merchantId, BigDecimal amount) {
+        // 检查校园卡状态
+        QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+        cardQuery.eq("id", cardId);
+        cardQuery.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+        if (campusCard == null) {
+            throw new RuntimeException("校园卡不存在");
+        }
+        if (campusCard.getStatus() == 0) {
+            throw new RuntimeException("校园卡已注销，无法消费");
+        }
+        if (campusCard.getStatus() == 2) {
+            throw new RuntimeException("校园卡已挂失，无法消费");
+        }
+        
         // 查找账户
         QueryWrapper<Account> accountQuery = new QueryWrapper<>();
         accountQuery.eq("card_id", cardId);
@@ -80,7 +106,23 @@ public class ConsumeServiceImpl implements ConsumeService {
     }
 
     @Override
-    public IPage<ConsumeRecord> getConsumeRecords(Long cardId, Long merchantId, Integer page, Integer size) {
+    @Transactional
+    public boolean consumeByCardNo(String cardNo, Long merchantId, BigDecimal amount) {
+        // 根据卡号查询校园卡
+        QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+        cardQuery.eq("card_no", cardNo);
+        cardQuery.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+        if (campusCard == null) {
+            throw new RuntimeException("校园卡不存在");
+        }
+        
+        // 调用现有的消费方法
+        return consume(campusCard.getId(), merchantId, amount);
+    }
+
+    @Override
+    public IPage<ConsumeRecordDTO> getConsumeRecords(String cardId, Long merchantId, Integer page, Integer size) {
         if (page == null || page < 1) {
             page = 1;
         }
@@ -93,16 +135,26 @@ public class ConsumeServiceImpl implements ConsumeService {
         QueryWrapper<ConsumeRecord> consumeQuery = new QueryWrapper<>();
         consumeQuery.eq("is_deleted", 0);
         
-        if (cardId != null) {
-            // 查找账户
-            QueryWrapper<Account> accountQuery = new QueryWrapper<>();
-            accountQuery.eq("card_id", cardId);
-            accountQuery.eq("is_deleted", 0);
-            Account account = accountMapper.selectOne(accountQuery);
-            if (account != null) {
-                consumeQuery.eq("account_id", account.getId());
+        if (cardId != null && !cardId.isEmpty()) {
+            // 根据卡号查询校园卡
+            QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+            cardQuery.eq("card_no", cardId);
+            cardQuery.eq("is_deleted", 0);
+            CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+            if (campusCard != null) {
+                // 查找账户
+                QueryWrapper<Account> accountQuery = new QueryWrapper<>();
+                accountQuery.eq("card_id", campusCard.getId());
+                accountQuery.eq("is_deleted", 0);
+                Account account = accountMapper.selectOne(accountQuery);
+                if (account != null) {
+                    consumeQuery.eq("account_id", account.getId());
+                } else {
+                    // 账户不存在，返回空页
+                    return new Page<>(page, size);
+                }
             } else {
-                // 账户不存在，返回空页
+                // 校园卡不存在，返回空页
                 return new Page<>(page, size);
             }
         }
@@ -112,6 +164,44 @@ public class ConsumeServiceImpl implements ConsumeService {
         }
         
         consumeQuery.orderByDesc("consume_time");
-        return consumeRecordMapper.selectPage(pageParam, consumeQuery);
+        IPage<ConsumeRecord> consumePage = consumeRecordMapper.selectPage(pageParam, consumeQuery);
+        
+        // 转换为DTO并添加卡号和商户名称
+        return consumePage.convert(consumeRecord -> {
+            ConsumeRecordDTO dto = new ConsumeRecordDTO();
+            dto.setId(consumeRecord.getId());
+            dto.setAccountId(consumeRecord.getAccountId());
+            dto.setMerchantId(consumeRecord.getMerchantId());
+            dto.setAmount(consumeRecord.getAmount());
+            dto.setBalanceAfter(consumeRecord.getBalanceAfter());
+            dto.setStatus(consumeRecord.getStatus());
+            dto.setConsumeTime(consumeRecord.getConsumeTime());
+            
+            // 获取卡号信息
+            QueryWrapper<Account> accountQuery = new QueryWrapper<>();
+            accountQuery.eq("id", consumeRecord.getAccountId());
+            accountQuery.eq("is_deleted", 0);
+            Account account = accountMapper.selectOne(accountQuery);
+            if (account != null) {
+                QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+                cardQuery.eq("id", account.getCardId());
+                cardQuery.eq("is_deleted", 0);
+                CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+                if (campusCard != null) {
+                    dto.setCardNo(campusCard.getCardNo());
+                }
+            }
+            
+            // 获取商户名称
+            QueryWrapper<Merchant> merchantQuery = new QueryWrapper<>();
+            merchantQuery.eq("id", consumeRecord.getMerchantId());
+            merchantQuery.eq("is_deleted", 0);
+            Merchant merchant = merchantMapper.selectOne(merchantQuery);
+            if (merchant != null) {
+                dto.setMerchantName(merchant.getMerchantName());
+            }
+            
+            return dto;
+        });
     }
 }

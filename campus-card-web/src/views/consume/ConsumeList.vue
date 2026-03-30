@@ -13,7 +13,14 @@
           <el-input v-model="searchForm.cardNo" placeholder="请输入卡号" clearable />
         </el-form-item>
         <el-form-item label="商户">
-          <el-input v-model="searchForm.merchantId" placeholder="请输入商户ID" clearable />
+          <el-select v-model="searchForm.merchantId" placeholder="请选择商户" clearable style="width: 200px">
+            <el-option
+              v-for="merchant in merchantList"
+              :key="merchant.id"
+              :label="merchant.merchantName"
+              :value="merchant.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
@@ -23,8 +30,8 @@
       
       <el-table :data="tableData" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="accountId" label="账户ID" width="100" />
-        <el-table-column prop="merchantId" label="商户ID" width="100" />
+        <el-table-column prop="cardNo" label="账户卡号" width="180" />
+        <el-table-column prop="merchantName" label="商户名称" width="180" />
         <el-table-column prop="amount" label="消费金额" width="120">
           <template #default="{ row }">
             <span style="color: #F56C6C; font-weight: bold">-¥{{ row.amount }}</span>
@@ -63,8 +70,8 @@
       width="500px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="卡号" prop="cardId">
-          <el-input v-model="form.cardId" placeholder="请输入卡号" />
+        <el-form-item label="卡号" prop="cardNo">
+          <el-input v-model="form.cardNo" placeholder="请输入卡号" />
         </el-form-item>
         <el-form-item label="商户" prop="merchantId">
           <el-select v-model="form.merchantId" placeholder="请选择商户" style="width: 100%">
@@ -91,7 +98,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getConsumeList, consume } from '@/api/consume'
+import { getConsumeList, consumeByCardNo } from '@/api/consume'
 import { getMerchantList } from '@/api/merchant'
 
 const formRef = ref(null)
@@ -111,13 +118,13 @@ const pagination = reactive({
 })
 
 const form = reactive({
-  cardId: null,
+  cardNo: null,
   merchantId: null,
   amount: 10
 })
 
 const rules = {
-  cardId: [
+  cardNo: [
     { required: true, message: '请输入卡号', trigger: 'blur' }
   ],
   merchantId: [
@@ -133,7 +140,8 @@ const loadData = async () => {
     const res = await getConsumeList({
       page: pagination.page,
       size: pagination.size,
-      ...searchForm
+      card_id: searchForm.cardNo,
+      merchant_id: searchForm.merchantId
     })
     if (res.code === 0) {
       tableData.value = res.data.records || []
@@ -169,7 +177,7 @@ const handleReset = () => {
 const handleConsume = () => {
   dialogVisible.value = true
   Object.assign(form, {
-    cardId: null,
+    cardNo: null,
     merchantId: null,
     amount: 10
   })
@@ -179,7 +187,7 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     
-    const res = await consume(form)
+    const res = await consumeByCardNo(form)
     if (res.code === 0) {
       ElMessage.success('消费成功')
       dialogVisible.value = false

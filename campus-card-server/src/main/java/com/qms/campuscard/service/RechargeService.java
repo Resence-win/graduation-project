@@ -6,6 +6,7 @@ import com.qms.campuscard.entity.RechargeRecord;
 public interface RechargeService {
 
     boolean recharge(Long cardId, java.math.BigDecimal amount, String rechargeType);
+    boolean rechargeByCardNo(String cardNo, java.math.BigDecimal amount, String rechargeType);
 
-    IPage<RechargeRecord> getRechargeRecords(Long cardId, Integer page, Integer size);
+    IPage<com.qms.campuscard.dto.RechargeRecordDTO> getRechargeRecords(Long cardId, Integer page, Integer size);
 }
