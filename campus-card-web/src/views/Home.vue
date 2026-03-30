@@ -3,22 +3,22 @@
     <el-row :gutter="20">
       <el-col :span="6">
         <el-card class="stat-card">
-          <el-statistic title="学生总数" :value="1000" />
+          <el-statistic title="学生总数" :value="dashboardData.studentCount" />
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
-          <el-statistic title="教师总数" :value="200" />
+          <el-statistic title="教师总数" :value="dashboardData.teacherCount" />
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
-          <el-statistic title="商户总数" :value="50" />
+          <el-statistic title="商户总数" :value="dashboardData.merchantCount" />
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
-          <el-statistic title="今日消费" :value="12500.5" :precision="2" prefix="¥" />
+          <el-statistic title="今日消费" :value="dashboardData.todayConsume" :precision="2" prefix="¥" />
         </el-card>
       </el-col>
     </el-row>
@@ -57,6 +57,30 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+import { getDashboardData } from '@/api/dashboard'
+
+const dashboardData = ref({
+  studentCount: 0,
+  teacherCount: 0,
+  merchantCount: 0,
+  todayConsume: 0
+})
+
+const loadDashboardData = async () => {
+  try {
+    const res = await getDashboardData()
+    if (res.code === 0) {
+      dashboardData.value = res.data
+    }
+  } catch (error) {
+    console.error('加载仪表盘数据失败:', error)
+  }
+}
+
+onMounted(() => {
+  loadDashboardData()
+})
 </script>
 
 <style scoped>

@@ -6,7 +6,10 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+
+import java.time.LocalDateTime;
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.Map;
 
 @Mapper
@@ -45,4 +48,9 @@ public interface ConsumeRecordMapper extends BaseMapper<ConsumeRecord> {
             "ORDER BY total_amount DESC " +
             "LIMIT #{limit}")
     List<Map<String, Object>> getMerchantRank(@Param("startDate") String startDate, @Param("endDate") String endDate, @Param("limit") Integer limit);
+
+    @Select("SELECT COALESCE(SUM(amount), 0) as total_amount " +
+            "FROM consume_record " +
+            "WHERE consume_time BETWEEN #{startOfDay} AND #{endOfDay} AND is_deleted=0")
+    BigDecimal getTodayConsumeAmount(@Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay);
 }
