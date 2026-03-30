@@ -128,8 +128,8 @@ const initUserRankChart = (data) => {
   
   userRankChart = echarts.init(userRankChartRef.value)
   
-  const names = data.map(item => item.name || `用户${item.userId}`)
-  const amounts = data.map(item => item.totalAmount)
+  const names = data.map(item => item.user_name || `用户${item.userId}`)
+  const amounts = data.map(item => item.total_amount)
   
   const option = {
     title: {
@@ -172,8 +172,8 @@ const initMerchantRankChart = (data) => {
   
   merchantRankChart = echarts.init(merchantRankChartRef.value)
   
-  const names = data.map(item => item.merchantName)
-  const amounts = data.map(item => item.totalAmount)
+  const names = data.map(item => item.merchant_name)
+  const amounts = data.map(item => item.total_amount)
   
   const option = {
     title: {
@@ -193,8 +193,8 @@ const initMerchantRankChart = (data) => {
       type: 'pie',
       radius: '50%',
       data: data.map(item => ({
-        value: item.totalAmount,
-        name: item.merchantName
+        value: item.total_amount,
+        name: item.merchant_name
       })),
       emphasis: {
         itemStyle: {
@@ -225,7 +225,10 @@ const loadConsumeData = async () => {
 
 const loadUserRank = async () => {
   try {
-    const res = await getUserRank()
+    const res = await getUserRank({
+      start_date: dateRange.value[0],
+      end_date: dateRange.value[1]
+    })
     if (res.code === 0) {
       initUserRankChart(res.data || [])
     }
@@ -236,7 +239,10 @@ const loadUserRank = async () => {
 
 const loadMerchantRank = async () => {
   try {
-    const res = await getMerchantRank()
+    const res = await getMerchantRank({
+      start_date: dateRange.value[0],
+      end_date: dateRange.value[1]
+    })
     if (res.code === 0) {
       initMerchantRankChart(res.data || [])
     }
@@ -247,6 +253,8 @@ const loadMerchantRank = async () => {
 
 const handleDateChange = () => {
   loadConsumeData()
+  loadUserRank()
+  loadMerchantRank()
 }
 
 const handleResize = () => {
