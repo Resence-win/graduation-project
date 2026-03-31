@@ -210,6 +210,8 @@ const loadConsumeData = async () => {
     if (cardInfo.id) {
       const res = await getConsumeList({
         card_id: cardInfo.id,
+        start_date: consumeForm.startDate ? new Date(consumeForm.startDate).toISOString().split('T')[0] : '',
+        end_date: consumeForm.endDate ? new Date(consumeForm.endDate).toISOString().split('T')[0] : '',
         page: consumePagination.page,
         size: consumePagination.size
       })

@@ -64,11 +64,13 @@ public class ConsumeController {
     public Result<IPage<com.qms.campuscard.dto.ConsumeRecordDTO>> getConsumeRecords(
             @RequestParam(required = false) String card_id,
             @RequestParam(required = false) Long merchant_id,
+            @RequestParam(required = false) String start_date,
+            @RequestParam(required = false) String end_date,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
-        IPage<com.qms.campuscard.dto.ConsumeRecordDTO> records = consumeService.getConsumeRecords(card_id, merchant_id, page, size);
+        IPage<com.qms.campuscard.dto.ConsumeRecordDTO> records = consumeService.getConsumeRecords(card_id, merchant_id, start_date, end_date, page, size);
         // 记录日志
-        logUtil.recordLog(1L, "查询", "consume_record", null, "查询消费记录，卡号：" + (card_id != null ? card_id : "全部") + "，商户：" + (merchant_id != null ? merchant_id : "全部"));
+        logUtil.recordLog(1L, "查询", "consume_record", null, "查询消费记录，卡号：" + (card_id != null ? card_id : "全部") + "，商户：" + (merchant_id != null ? merchant_id : "全部") + "，开始日期：" + (start_date != null ? start_date : "全部") + "，结束日期：" + (end_date != null ? end_date : "全部"));
         return Result.success(records);
     }
 }

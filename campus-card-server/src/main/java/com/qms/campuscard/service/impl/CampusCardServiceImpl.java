@@ -169,13 +169,19 @@ public class CampusCardServiceImpl implements CampusCardService {
         
         // 获取用户信息
         if ("student".equals(campusCard.getUserType())) {
-            Student student = studentMapper.selectById(campusCard.getUserId());
+            QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
+            studentQueryWrapper.eq("id", campusCard.getUserId());
+            studentQueryWrapper.eq("is_deleted", 0);
+            Student student = studentMapper.selectOne(studentQueryWrapper);
             if (student != null) {
                 dto.setUserNo(student.getStudentNo());
                 dto.setUserName(student.getName());
             }
         } else if ("teacher".equals(campusCard.getUserType())) {
-            Teacher teacher = teacherMapper.selectById(campusCard.getUserId());
+            QueryWrapper<Teacher> teacherQueryWrapper = new QueryWrapper<>();
+            teacherQueryWrapper.eq("id", campusCard.getUserId());
+            teacherQueryWrapper.eq("is_deleted", 0);
+            Teacher teacher = teacherMapper.selectOne(teacherQueryWrapper);
             if (teacher != null) {
                 dto.setUserNo(teacher.getTeacherNo());
                 dto.setUserName(teacher.getName());
@@ -260,11 +266,19 @@ public class CampusCardServiceImpl implements CampusCardService {
             return false;
         }
         
+        // 更新校园卡状态
         campusCard.setStatus(2); // 2表示挂失状态
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
         
         if (success) {
+            // 更新账户状态
+            Account account = getAccountByCardId(cardId);
+            if (account != null) {
+                account.setStatus(2); // 2表示挂失状态
+                account.setUpdateTime(LocalDateTime.now());
+                accountMapper.updateById(account);
+            }
             // 记录挂失操作
             recordCardChange(cardId, "挂失", "正常", "挂失");
         }
@@ -279,11 +293,19 @@ public class CampusCardServiceImpl implements CampusCardService {
             return false;
         }
         
+        // 更新校园卡状态
         campusCard.setStatus(1); // 1表示正常状态
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
         
         if (success) {
+            // 更新账户状态
+            Account account = getAccountByCardId(cardId);
+            if (account != null) {
+                account.setStatus(1); // 1表示正常状态
+                account.setUpdateTime(LocalDateTime.now());
+                accountMapper.updateById(account);
+            }
             // 记录解挂操作
             recordCardChange(cardId, "解挂", "挂失", "正常");
         }
@@ -298,11 +320,19 @@ public class CampusCardServiceImpl implements CampusCardService {
             return false;
         }
         
+        // 更新校园卡状态
         campusCard.setStatus(0); // 0表示注销状态
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
         
         if (success) {
+            // 更新账户状态
+            Account account = getAccountByCardId(cardId);
+            if (account != null) {
+                account.setStatus(0); // 0表示注销状态
+                account.setUpdateTime(LocalDateTime.now());
+                accountMapper.updateById(account);
+            }
             // 记录注销操作
             recordCardChange(cardId, "注销", null, "校园卡注销");
         }
@@ -360,13 +390,19 @@ public class CampusCardServiceImpl implements CampusCardService {
         
         // 获取用户信息
         if ("student".equals(campusCard.getUserType())) {
-            Student student = studentMapper.selectById(campusCard.getUserId());
+            QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
+            studentQueryWrapper.eq("id", campusCard.getUserId());
+            studentQueryWrapper.eq("is_deleted", 0);
+            Student student = studentMapper.selectOne(studentQueryWrapper);
             if (student != null) {
                 dto.setUserNo(student.getStudentNo());
                 dto.setUserName(student.getName());
             }
         } else if ("teacher".equals(campusCard.getUserType())) {
-            Teacher teacher = teacherMapper.selectById(campusCard.getUserId());
+            QueryWrapper<Teacher> teacherQueryWrapper = new QueryWrapper<>();
+            teacherQueryWrapper.eq("id", campusCard.getUserId());
+            teacherQueryWrapper.eq("is_deleted", 0);
+            Teacher teacher = teacherMapper.selectOne(teacherQueryWrapper);
             if (teacher != null) {
                 dto.setUserNo(teacher.getTeacherNo());
                 dto.setUserName(teacher.getName());
@@ -424,13 +460,19 @@ public class CampusCardServiceImpl implements CampusCardService {
             
             // 获取用户信息
             if ("student".equals(campusCard.getUserType())) {
-                Student student = studentMapper.selectById(campusCard.getUserId());
+                QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
+                studentQueryWrapper.eq("id", campusCard.getUserId());
+                studentQueryWrapper.eq("is_deleted", 0);
+                Student student = studentMapper.selectOne(studentQueryWrapper);
                 if (student != null) {
                     dto.setUserNo(student.getStudentNo());
                     dto.setUserName(student.getName());
                 }
             } else if ("teacher".equals(campusCard.getUserType())) {
-                Teacher teacher = teacherMapper.selectById(campusCard.getUserId());
+                QueryWrapper<Teacher> teacherQueryWrapper = new QueryWrapper<>();
+                teacherQueryWrapper.eq("id", campusCard.getUserId());
+                teacherQueryWrapper.eq("is_deleted", 0);
+                Teacher teacher = teacherMapper.selectOne(teacherQueryWrapper);
                 if (teacher != null) {
                     dto.setUserNo(teacher.getTeacherNo());
                     dto.setUserName(teacher.getName());

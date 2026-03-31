@@ -122,7 +122,7 @@ public class ConsumeServiceImpl implements ConsumeService {
     }
 
     @Override
-    public IPage<ConsumeRecordDTO> getConsumeRecords(String cardId, Long merchantId, Integer page, Integer size) {
+    public IPage<ConsumeRecordDTO> getConsumeRecords(String cardId, Long merchantId, String startDate, String endDate, Integer page, Integer size) {
         if (page == null || page < 1) {
             page = 1;
         }
@@ -136,11 +136,22 @@ public class ConsumeServiceImpl implements ConsumeService {
         consumeQuery.eq("is_deleted", 0);
         
         if (cardId != null && !cardId.isEmpty()) {
-            // 根据卡号查询校园卡
-            QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
-            cardQuery.eq("card_no", cardId);
-            cardQuery.eq("is_deleted", 0);
-            CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+            CampusCard campusCard = null;
+            try {
+                // 尝试将 cardId 转换为 Long，如果成功，则按 ID 查询
+                Long id = Long.parseLong(cardId);
+                QueryWrapper<CampusCard> cardQueryById = new QueryWrapper<>();
+                cardQueryById.eq("id", id);
+                cardQueryById.eq("is_deleted", 0);
+                campusCard = campusCardMapper.selectOne(cardQueryById);
+            } catch (NumberFormatException e) {
+                // 如果转换失败，则按卡号查询
+                QueryWrapper<CampusCard> cardQueryByNo = new QueryWrapper<>();
+                cardQueryByNo.eq("card_no", cardId);
+                cardQueryByNo.eq("is_deleted", 0);
+                campusCard = campusCardMapper.selectOne(cardQueryByNo);
+            }
+            
             if (campusCard != null) {
                 // 查找账户
                 QueryWrapper<Account> accountQuery = new QueryWrapper<>();
@@ -161,6 +172,14 @@ public class ConsumeServiceImpl implements ConsumeService {
         
         if (merchantId != null) {
             consumeQuery.eq("merchant_id", merchantId);
+        }
+        
+        if (startDate != null && !startDate.isEmpty()) {
+            consumeQuery.ge("consume_time", startDate + " 00:00:00");
+        }
+        
+        if (endDate != null && !endDate.isEmpty()) {
+            consumeQuery.le("consume_time", endDate + " 23:59:59");
         }
         
         consumeQuery.orderByDesc("consume_time");

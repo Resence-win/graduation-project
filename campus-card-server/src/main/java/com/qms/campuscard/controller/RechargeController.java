@@ -27,10 +27,10 @@ public class RechargeController {
     @PostMapping
     public Result<Boolean> recharge(@RequestBody RechargeRequest request) {
         try {
-            boolean success = rechargeService.recharge(request.getCardId(), request.getAmount(), request.getRechargeType());
+            boolean success = rechargeService.recharge(request.getCardId(), request.getAmount(), request.getRechargeType(), request.getOperatorId(), request.getOperatorName());
             if (success) {
                 // 记录日志
-                logUtil.recordLog(1L, "新增", "recharge_record", null, "充值成功，卡号：" + request.getCardId() + "，金额：" + request.getAmount());
+                logUtil.recordLog(request.getOperatorId() != null ? request.getOperatorId() : 1L, "新增", "recharge_record", null, "充值成功，卡号：" + request.getCardId() + "，金额：" + request.getAmount());
                 return Result.success("充值成功", true);
             } else {
                 return Result.error("充值失败");
@@ -45,10 +45,10 @@ public class RechargeController {
     @PostMapping("/by-card-no")
     public Result<Boolean> rechargeByCardNo(@RequestBody RechargeByCardNoRequest request) {
         try {
-            boolean success = rechargeService.rechargeByCardNo(request.getCardNo(), request.getAmount(), request.getRechargeType());
+            boolean success = rechargeService.rechargeByCardNo(request.getCardNo(), request.getAmount(), request.getRechargeType(), request.getOperatorId(), request.getOperatorName());
             if (success) {
                 // 记录日志
-                logUtil.recordLog(1L, "新增", "recharge_record", null, "充值成功，卡号：" + request.getCardNo() + "，金额：" + request.getAmount());
+                logUtil.recordLog(request.getOperatorId() != null ? request.getOperatorId() : 1L, "新增", "recharge_record", null, "充值成功，卡号：" + request.getCardNo() + "，金额：" + request.getAmount());
                 return Result.success("充值成功", true);
             } else {
                 return Result.error("充值失败");

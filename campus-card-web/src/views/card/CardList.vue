@@ -116,7 +116,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCardList, openCard, lossCard, unlossCard, cancelCard } from '@/api/card'
+import { getCardList, openCard, getCardInfo, lossCard, unlossCard, cancelCard } from '@/api/card'
 
 const formRef = ref(null)
 const dialogVisible = ref(false)
@@ -232,7 +232,7 @@ const handleLoss = async (row) => {
       type: 'warning'
     })
     
-    const res = await lossCard({ card_id: row.id })
+    const res = await lossCard({ cardId: row.id })
     if (res.code === 0) {
       ElMessage.success('挂失成功')
       loadData()
@@ -252,7 +252,7 @@ const handleUnloss = async (row) => {
       type: 'info'
     })
     
-    const res = await unlossCard({ card_id: row.id })
+    const res = await unlossCard({ cardId: row.id })
     if (res.code === 0) {
       ElMessage.success('解挂成功')
       loadData()
@@ -272,7 +272,7 @@ const handleCancel = async (row) => {
       type: 'error'
     })
     
-    const res = await cancelCard({ card_id: row.id })
+    const res = await cancelCard({ cardId: row.id })
     if (res.code === 0) {
       ElMessage.success('注销成功')
       loadData()

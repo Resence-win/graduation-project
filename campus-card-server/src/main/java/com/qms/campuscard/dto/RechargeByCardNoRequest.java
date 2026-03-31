@@ -11,4 +11,6 @@ public class RechargeByCardNoRequest implements Serializable {
     private String cardNo;
     private BigDecimal amount;
     private String rechargeType;
+    private Long operatorId;
+    private String operatorName;
 }

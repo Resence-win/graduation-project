@@ -37,7 +37,7 @@ public class RechargeServiceImpl implements RechargeService {
 
     @Override
     @Transactional
-    public boolean recharge(Long cardId, BigDecimal amount, String rechargeType) {
+    public boolean recharge(Long cardId, BigDecimal amount, String rechargeType, Long operatorId, String operatorName) {
         // 检查校园卡状态
         QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
         cardQuery.eq("id", cardId);
@@ -73,7 +73,7 @@ public class RechargeServiceImpl implements RechargeService {
         rechargeRecord.setAccountId(account.getId());
         rechargeRecord.setAmount(amount);
         rechargeRecord.setRechargeType(rechargeType);
-        rechargeRecord.setOperatorId(null);
+        rechargeRecord.setOperatorId(operatorId != null ? operatorId : 1L); // 默认操作为1（系统）
         rechargeRecord.setIsDeleted(0);
         rechargeRecord.setCreateTime(LocalDateTime.now());
         rechargeRecordMapper.insert(rechargeRecord);
@@ -94,7 +94,7 @@ public class RechargeServiceImpl implements RechargeService {
 
     @Override
     @Transactional
-    public boolean rechargeByCardNo(String cardNo, BigDecimal amount, String rechargeType) {
+    public boolean rechargeByCardNo(String cardNo, BigDecimal amount, String rechargeType, Long operatorId, String operatorName) {
         // 根据卡号查询校园卡
         QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
         cardQuery.eq("card_no", cardNo);
@@ -105,7 +105,7 @@ public class RechargeServiceImpl implements RechargeService {
         }
         
         // 调用现有的充值方法
-        return recharge(campusCard.getId(), amount, rechargeType);
+        return recharge(campusCard.getId(), amount, rechargeType, operatorId, operatorName);
     }
 
     @Override
@@ -147,6 +147,8 @@ public class RechargeServiceImpl implements RechargeService {
             dto.setAmount(rechargeRecord.getAmount());
             dto.setRechargeType(rechargeRecord.getRechargeType());
             dto.setOperatorId(rechargeRecord.getOperatorId());
+            // 设置操作人姓名，这里简化处理，直接使用操作人ID作为姓名
+            dto.setOperatorName(rechargeRecord.getOperatorId() != null ? "用户" + rechargeRecord.getOperatorId() : "系统");
             dto.setCreateTime(rechargeRecord.getCreateTime());
             
             // 获取卡号信息

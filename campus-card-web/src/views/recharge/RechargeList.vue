@@ -27,7 +27,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="rechargeType" label="充值方式" width="120" />
-        <el-table-column prop="operatorId" label="操作人" width="100" />
+        <el-table-column prop="operatorName" label="操作人" width="100" />
         <el-table-column prop="createTime" label="充值时间" width="180" />
       </el-table>
       
@@ -148,7 +148,18 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     
-    const res = await rechargeByCardNo(form)
+    // 获取当前登录用户信息
+    const userStr = localStorage.getItem('user')
+    const user = userStr ? JSON.parse(userStr) : null
+    
+    // 构建充值请求参数，添加操作人信息
+    const rechargeData = {
+      ...form,
+      operatorId: user ? user.id : 1, // 默认操作为1（系统）
+      operatorName: user ? user.username : '系统'
+    }
+    
+    const res = await rechargeByCardNo(rechargeData)
     if (res.code === 0) {
       ElMessage.success('充值成功')
       dialogVisible.value = false

@@ -62,7 +62,7 @@
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="教师编号" prop="teacherNo">
-          <el-input v-model="form.teacherNo" placeholder="请输入教师编号" />
+          <el-input v-model="form.teacherNo" placeholder="请输入教师编号" :disabled="!!form.id" />
         </el-form-item>
         <el-form-item label="姓名" prop="name">
           <el-input v-model="form.name" placeholder="请输入姓名" />
