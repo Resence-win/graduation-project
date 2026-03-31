@@ -82,17 +82,83 @@
           />
         </el-tab-pane>
         
+        <el-tab-pane label="图书借阅" name="book" v-if="userInfo.role === 'student'">
+          <el-form :inline="true" :model="bookSearchForm" class="mb-4">
+            <el-form-item label="书名">
+              <el-input v-model="bookSearchForm.bookName" placeholder="请输入书名" clearable />
+            </el-form-item>
+            <el-form-item label="作者">
+              <el-input v-model="bookSearchForm.author" placeholder="请输入作者" clearable />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="loadBookData">查询</el-button>
+              <el-button @click="resetBookSearchForm">重置</el-button>
+            </el-form-item>
+          </el-form>
+          
+          <el-table :data="bookList" border style="width: 100%">
+            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="bookName" label="书名" width="200" />
+            <el-table-column prop="author" label="作者" width="120" />
+            <el-table-column prop="logo" label="封面" width="100">
+              <template #default="{ row }">
+                <el-image
+                  v-if="row.logo"
+                  :src="'/api' + row.logo"
+                  style="width: 50px; height: 50px"
+                  :preview-src-list="['/api' + row.logo]"
+                />
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 1 ? 'success' : 'warning'">
+                  {{ row.status === 1 ? '可借阅' : '已借出' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150" fixed="right">
+              <template #default="{ row }">
+                <template v-if="hasPendingApplication(row.id)">
+                  <el-button size="small" type="info" disabled>申请中</el-button>
+                </template>
+                <template v-else>
+                  <el-button size="small" type="primary" @click="handleBorrow(row)" :disabled="row.status !== 1">借阅</el-button>
+                </template>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <el-pagination
+            v-model:current-page="bookPagination.page"
+            v-model:page-size="bookPagination.size"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="bookPagination.total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleBookSizeChange"
+            @current-change="handleBookCurrentChange"
+            style="margin-top: 20px; justify-content: flex-end"
+          />
+        </el-tab-pane>
+        
         <el-tab-pane label="借阅记录" name="borrow" v-if="userInfo.role === 'student'">
           <el-table :data="borrowList" border style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="bookName" label="书名" width="200" />
             <el-table-column prop="borrowTime" label="借阅时间" width="180" />
+            <el-table-column prop="dueTime" label="到期时间" width="180" />
             <el-table-column prop="returnTime" label="归还时间" width="180" />
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
                 <el-tag :type="row.status === 1 ? 'warning' : 'success'">
-                  {{ row.status === 1 ? '已借阅' : '已归还' }}
+                  {{ row.status === 1 ? '借阅中' : '已归还' }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" type="primary" @click="handleReturn(row)" :disabled="row.status !== 1">归还</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -109,6 +175,35 @@
           />
         </el-tab-pane>
       </el-tabs>
+
+      <!-- 借阅对话框 -->
+      <el-dialog
+        v-model="borrowDialogVisible"
+        title="图书借阅"
+        width="400px"
+      >
+        <el-form :model="borrowForm" label-width="80px">
+          <el-form-item label="借阅天数">
+            <el-select v-model="borrowForm.borrowDays" placeholder="请选择借阅天数">
+              <el-option
+                v-for="option in borrowDaysOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="自定义天数" v-if="borrowForm.borrowDays === 0">
+            <el-input v-model="borrowForm.customDays" type="number" placeholder="请输入借阅天数" min="1" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="borrowDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleSubmitBorrowApplication">提交申请</el-button>
+          </span>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -116,12 +211,12 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElDialog, ElForm, ElFormItem, ElSelect, ElOption, ElInput, ElDatePicker, ElButton } from 'element-plus'
 import { getStudentByNo } from '@/api/student'
 import { getTeacherByNo } from '@/api/teacher'
 import { getCardInfo, getCardByUserNo } from '@/api/card'
 import { getConsumeList } from '@/api/consume'
-import { getBorrowList } from '@/api/book'
+import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, returnBook } from '@/api/book'
 
 const router = useRouter()
 
@@ -160,6 +255,53 @@ const borrowPagination = reactive({
   size: 10,
   total: 0
 })
+
+const bookList = ref([])
+const bookPagination = reactive({
+  page: 1,
+  size: 10,
+  total: 0
+})
+
+// 借阅申请列表
+const borrowApplications = ref([])
+const loadBorrowApplications = async () => {
+  try {
+    if (!cardInfo.id) return
+    
+    const res = await getBorrowApplications({
+      card_id: cardInfo.id
+    })
+    if (res.code === 0) {
+      borrowApplications.value = res.data.records || []
+    }
+  } catch (error) {
+    console.error('加载借阅申请列表失败:', error)
+  }
+}
+
+// 检查图书是否有未处理的借阅申请
+const hasPendingApplication = (bookId) => {
+  return borrowApplications.value.some(app => app.bookId === bookId && app.status === 1)
+}
+
+const bookSearchForm = reactive({
+  bookName: '',
+  author: ''
+})
+
+const borrowDialogVisible = ref(false)
+const currentBook = ref(null)
+const borrowForm = reactive({
+  borrowDays: 7,
+  customDays: ''
+})
+const borrowDaysOptions = [
+  { value: 7, label: '7天' },
+  { value: 15, label: '15天' },
+  { value: 30, label: '30天' },
+  { value: 0, label: '自定义' }
+]
 
 const loadUserInfo = async () => {
   try {
@@ -269,6 +411,117 @@ const handleBorrowCurrentChange = (val) => {
   loadBorrowData()
 }
 
+const loadBookData = async () => {
+  try {
+    const res = await getBookList({
+      bookName: bookSearchForm.bookName,
+      author: bookSearchForm.author,
+      page: bookPagination.page,
+      size: bookPagination.size
+    })
+    if (res.code === 0) {
+      bookList.value = res.data.records || []
+      bookPagination.total = res.data.total || 0
+    }
+    // 加载借阅申请列表
+    await loadBorrowApplications()
+  } catch (error) {
+    console.error('加载图书列表失败:', error)
+  }
+}
+
+const resetBookSearchForm = () => {
+  bookSearchForm.bookName = ''
+  bookSearchForm.author = ''
+  loadBookData()
+}
+
+const handleBookSizeChange = (val) => {
+  bookPagination.size = val
+  loadBookData()
+}
+
+const handleBookCurrentChange = (val) => {
+  bookPagination.page = val
+  loadBookData()
+}
+
+const handleBorrow = (book) => {
+  currentBook.value = book
+  borrowDialogVisible.value = true
+}
+
+const handleSubmitBorrowApplication = async () => {
+  try {
+    if (!cardInfo.id || !currentBook.value) {
+      ElMessage.error('请先加载校园卡信息')
+      return
+    }
+
+    // 检查当前借阅数量
+    const countRes = await getActiveBorrowCount({ card_id: cardInfo.id })
+    if (countRes.code === 0 && countRes.data >= 3) {
+      ElMessage.error('您当前已借阅3本图书，无法继续借阅')
+      return
+    }
+
+    let borrowDays = borrowForm.borrowDays
+    if (borrowForm.borrowDays === 0) {
+      if (!borrowForm.customDays || isNaN(borrowForm.customDays) || borrowForm.customDays <= 0) {
+        ElMessage.error('请输入有效的自定义借阅天数')
+        return
+      }
+      borrowDays = parseInt(borrowForm.customDays)
+    }
+
+    const res = await submitBorrowApplication({
+      cardId: cardInfo.id,
+      bookId: currentBook.value.id,
+      borrowDays: borrowDays
+    })
+
+    if (res.code === 0) {
+      ElMessage.success('借阅申请提交成功，请等待管理员审批')
+      borrowDialogVisible.value = false
+      // 重新加载图书列表和借阅申请列表
+      await loadBookData()
+    } else {
+      ElMessage.error(res.message || '借阅申请提交失败')
+    }
+  } catch (error) {
+    console.error('提交借阅申请失败:', error)
+    if (error.response && error.response.data && error.response.data.msg) {
+      ElMessage.error(error.response.data.msg)
+    } else if (error.message) {
+      ElMessage.error(error.message)
+    } else {
+      ElMessage.error('提交借阅申请失败，请稍后重试')
+    }
+  }
+}
+
+const handleReturn = async (borrowRecord) => {
+  try {
+    const res = await returnBook({ borrow_id: borrowRecord.id })
+    if (res.code === 0) {
+      ElMessage.success('图书归还成功')
+      loadBorrowData()
+      loadBookData() // 重新加载图书列表，更新图书状态
+    } else {
+      ElMessage.error(res.message || '图书归还失败')
+    }
+  } catch (error) {
+    console.error('归还图书失败:', error)
+    if (error.response && error.response.data && error.response.data.msg) {
+      ElMessage.error(error.response.data.msg)
+    } else if (error.message) {
+      ElMessage.error(error.message)
+    } else {
+      ElMessage.error('归还图书失败，请稍后重试')
+    }
+  }
+}
+
 const logout = () => {
   // 清除本地存储中的用户信息和token
   localStorage.removeItem('token')
@@ -278,12 +531,13 @@ const logout = () => {
   router.push('/login')
 }
 
-onMounted(() => {
-  loadUserInfo()
-  loadCardInfo()
+onMounted(async () => {
+  await loadUserInfo()
+  await loadCardInfo()
   loadConsumeData()
   if (userInfo.role === 'student') {
     loadBorrowData()
+    loadBookData()
   }
 })
 </script>

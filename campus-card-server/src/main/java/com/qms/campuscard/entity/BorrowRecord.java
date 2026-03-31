@@ -27,11 +27,17 @@ public class BorrowRecord implements Serializable {
     @TableField("book_id")
     private Long bookId;
 
+    @TableField("application_id")
+    private Long applicationId;
+
     @TableField("borrow_time")
     private LocalDateTime borrowTime;
 
     @TableField("return_time")
     private LocalDateTime returnTime;
+
+    @TableField("due_time")
+    private LocalDateTime dueTime;
 
     @TableField("status")
     private Integer status;
@@ -41,4 +47,15 @@ public class BorrowRecord implements Serializable {
 
     @TableField("is_deleted")
     private Integer isDeleted;
+    
+    @TableField(exist = false)
+    private String bookName;
+    
+    public String getBookName() {
+        return bookName;
+    }
+    
+    public void setBookName(String bookName) {
+        this.bookName = bookName;
+    }
 }

@@ -31,9 +31,25 @@ export const borrowBook = (data) => {
 }
 
 export const returnBook = (params) => {
-  return request.post('/borrow/return', params)
+  return request.post('/borrow/return', {}, { params })
 }
 
 export const getBorrowList = (params) => {
   return request.get('/borrow/list', { params })
+}
+
+export const submitBorrowApplication = (data) => {
+  return request.post('/borrow/application', data)
+}
+
+export const approveBorrowApplication = (params) => {
+  return request.post('/borrow/application/approve', {}, { params })
+}
+
+export const getBorrowApplications = (params) => {
+  return request.get('/borrow/application/list', { params })
+}
+
+export const getActiveBorrowCount = (params) => {
+  return request.get('/borrow/active-count', { params })
 }

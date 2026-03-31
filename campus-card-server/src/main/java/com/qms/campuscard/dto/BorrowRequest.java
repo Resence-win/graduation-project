@@ -9,4 +9,5 @@ public class BorrowRequest implements Serializable {
 
     private Long cardId;
     private Long bookId;
+    private Integer borrowDays;
 }

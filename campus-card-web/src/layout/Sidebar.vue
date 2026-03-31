@@ -40,7 +40,13 @@
           <span>系统管理</span>
         </template>
         <el-menu-item index="/statistics">数据统计</el-menu-item>
-        <el-menu-item index="/book">图书管理</el-menu-item>
+        <el-sub-menu index="book">
+          <template #title>
+            <span>图书管理</span>
+          </template>
+          <el-menu-item index="/book">图书列表</el-menu-item>
+          <el-menu-item index="/book/application">借阅申请</el-menu-item>
+        </el-sub-menu>
         <el-menu-item index="/access">门禁管理</el-menu-item>
         <el-menu-item index="/attendance">考勤管理</el-menu-item>
         <el-menu-item index="/commute">通勤车管理</el-menu-item>

@@ -6,6 +6,7 @@ import com.qms.campuscard.common.Result;
 import com.qms.campuscard.dto.BorrowRequest;
 import com.qms.campuscard.entity.Book;
 import com.qms.campuscard.entity.BorrowRecord;
+import com.qms.campuscard.entity.BorrowApplication;
 import com.qms.campuscard.service.BookService;
 import com.qms.campuscard.service.BorrowService;
 import org.springframework.web.bind.annotation.*;
@@ -61,6 +62,55 @@ public class BookController {
         } else {
             return Result.error("借阅失败");
         }
+    }
+
+    @PostMapping("/borrow/application")
+    public Result<Boolean> submitBorrowApplication(@RequestBody BorrowRequest request) {
+        boolean success = borrowService.submitBorrowApplication(request.getCardId(), request.getBookId(), request.getBorrowDays());
+        if (success) {
+            // 记录日志
+            logUtil.recordLog(1L, "新增", "borrow_application", null, "提交借阅申请，卡号：" + request.getCardId() + "，图书ID：" + request.getBookId() + "，借阅天数：" + request.getBorrowDays());
+            return Result.success("提交申请成功", true);
+        } else {
+            return Result.error("提交申请失败");
+        }
+    }
+
+    @PostMapping("/borrow/application/approve")
+    public Result<Boolean> approveBorrowApplication(
+            @RequestParam("application_id") Long applicationId,
+            @RequestParam("status") Integer status,
+            @RequestParam("operator_id") Long operatorId,
+            @RequestParam(required = false) String remark) {
+        boolean success = borrowService.approveBorrowApplication(applicationId, status, operatorId, remark);
+        if (success) {
+            // 记录日志
+            logUtil.recordLog(operatorId, "修改", "borrow_application", applicationId, "审批借阅申请，状态：" + (status == 2 ? "批准" : "拒绝"));
+            return Result.success("审批成功", true);
+        } else {
+            return Result.error("审批失败");
+        }
+    }
+
+    @GetMapping("/borrow/application/list")
+    public Result<IPage<BorrowApplication>> getBorrowApplications(
+            @RequestParam(required = false) Long card_id,
+            @RequestParam(required = false) Long book_id,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        IPage<BorrowApplication> applications = borrowService.getBorrowApplications(card_id, book_id, status, page, size);
+        // 记录日志
+        logUtil.recordLog(1L, "查询", "borrow_application", null, "查询借阅申请列表");
+        return Result.success(applications);
+    }
+
+    @GetMapping("/borrow/active-count")
+    public Result<Integer> getActiveBorrowCount(@RequestParam("card_id") Long cardId) {
+        int count = borrowService.getActiveBorrowCount(cardId);
+        // 记录日志
+        logUtil.recordLog(1L, "查询", "borrow_record", null, "查询活跃借阅数量，卡号：" + cardId);
+        return Result.success(count);
     }
 
     @PostMapping("/book")

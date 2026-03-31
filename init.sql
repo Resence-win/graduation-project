@@ -324,16 +324,51 @@ COMMENT ON COLUMN book.create_time IS '创建时间';
 COMMENT ON COLUMN book.is_deleted IS '是否删除';
 
 -- ========================
--- 14. 借阅记录
+-- 14. 借阅申请表
+-- ========================
+DROP TABLE IF EXISTS borrow_application;
+CREATE TABLE borrow_application (
+    id BIGSERIAL PRIMARY KEY,
+    card_id BIGINT,
+    book_id BIGINT,
+    borrow_days INT,
+    application_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status INT DEFAULT 1, -- 1: 待审批, 2: 已批准, 3: 已拒绝
+    operator_id BIGINT,
+    approval_time TIMESTAMP,
+    remark VARCHAR(200),
+    is_deleted INT DEFAULT 0,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP
+);
+
+COMMENT ON TABLE borrow_application IS '借阅申请表';
+COMMENT ON COLUMN borrow_application.id IS '主键ID';
+COMMENT ON COLUMN borrow_application.card_id IS '卡ID';
+COMMENT ON COLUMN borrow_application.book_id IS '图书ID';
+COMMENT ON COLUMN borrow_application.borrow_days IS '借阅天数';
+COMMENT ON COLUMN borrow_application.application_time IS '申请时间';
+COMMENT ON COLUMN borrow_application.status IS '状态(1: 待审批, 2: 已批准, 3: 已拒绝)';
+COMMENT ON COLUMN borrow_application.operator_id IS '操作人ID';
+COMMENT ON COLUMN borrow_application.approval_time IS '审批时间';
+COMMENT ON COLUMN borrow_application.remark IS '备注';
+COMMENT ON COLUMN borrow_application.is_deleted IS '是否删除';
+COMMENT ON COLUMN borrow_application.create_time IS '创建时间';
+COMMENT ON COLUMN borrow_application.update_time IS '更新时间';
+
+-- ========================
+-- 15. 借阅记录
 -- ========================
 DROP TABLE IF EXISTS borrow_record;
 CREATE TABLE borrow_record (
     id BIGSERIAL PRIMARY KEY,
     card_id BIGINT,
     book_id BIGINT,
+    application_id BIGINT,
     borrow_time TIMESTAMP,
     return_time TIMESTAMP,
-    status INT DEFAULT 1,
+    due_time TIMESTAMP,
+    status INT DEFAULT 1, -- 1: 借阅中, 2: 已归还, 3: 超期
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted INT DEFAULT 0
 );
@@ -342,14 +377,16 @@ COMMENT ON TABLE borrow_record IS '借阅记录表';
 COMMENT ON COLUMN borrow_record.id IS '主键ID';
 COMMENT ON COLUMN borrow_record.card_id IS '卡ID';
 COMMENT ON COLUMN borrow_record.book_id IS '图书ID';
+COMMENT ON COLUMN borrow_record.application_id IS '申请ID';
 COMMENT ON COLUMN borrow_record.borrow_time IS '借阅时间';
 COMMENT ON COLUMN borrow_record.return_time IS '归还时间';
-COMMENT ON COLUMN borrow_record.status IS '状态';
+COMMENT ON COLUMN borrow_record.due_time IS '到期时间';
+COMMENT ON COLUMN borrow_record.status IS '状态(1: 借阅中, 2: 已归还, 3: 超期)';
 COMMENT ON COLUMN borrow_record.create_time IS '创建时间';
 COMMENT ON COLUMN borrow_record.is_deleted IS '是否删除';
 
 -- ========================
--- 15. 考勤记录
+-- 16. 考勤记录
 -- ========================
 DROP TABLE IF EXISTS attendance_record;
 CREATE TABLE attendance_record (
@@ -368,7 +405,7 @@ COMMENT ON COLUMN attendance_record.record_time IS '记录时间';
 COMMENT ON COLUMN attendance_record.is_deleted IS '是否删除';
 
 -- ========================
--- 16. 通勤车记录
+-- 17. 通勤车记录
 -- ========================
 DROP TABLE IF EXISTS commute_record;
 CREATE TABLE commute_record (
@@ -391,7 +428,7 @@ COMMENT ON COLUMN commute_record.status IS '状态';
 COMMENT ON COLUMN commute_record.is_deleted IS '是否删除';
 
 -- ========================
--- 17. 操作日志
+-- 18. 操作日志
 -- ========================
 DROP TABLE IF EXISTS operation_log;
 CREATE TABLE operation_log (
@@ -484,6 +521,12 @@ CREATE INDEX idx_access_card_id ON access_record(card_id);
 CREATE INDEX idx_access_time ON access_record(access_time);
 CREATE INDEX idx_borrow_card_id ON borrow_record(card_id);
 CREATE INDEX idx_borrow_book_id ON borrow_record(book_id);
+CREATE INDEX idx_borrow_status ON borrow_record(status);
+CREATE INDEX idx_borrow_due_time ON borrow_record(due_time);
+CREATE INDEX idx_borrow_application_card_id ON borrow_application(card_id);
+CREATE INDEX idx_borrow_application_book_id ON borrow_application(book_id);
+CREATE INDEX idx_borrow_application_status ON borrow_application(status);
+CREATE INDEX idx_borrow_application_time ON borrow_application(application_time);
 CREATE INDEX idx_attendance_card_id ON attendance_record(card_id);
 CREATE INDEX idx_attendance_time ON attendance_record(record_time);
 CREATE INDEX idx_commute_card_id ON commute_record(card_id);
