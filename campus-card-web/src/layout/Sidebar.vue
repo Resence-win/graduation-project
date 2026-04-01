@@ -35,31 +35,54 @@
       </el-sub-menu>
       
       <el-sub-menu index="system">
-        <template #title>
-          <el-icon><Setting /></el-icon>
-          <span>系统管理</span>
-        </template>
-        <el-menu-item index="/statistics">数据统计</el-menu-item>
-        <el-sub-menu index="book">
           <template #title>
-            <span>图书管理</span>
+            <el-icon><Setting /></el-icon>
+            <span>系统管理</span>
           </template>
-          <el-menu-item index="/book">图书列表</el-menu-item>
-          <el-menu-item index="/book/application">借阅申请</el-menu-item>
+          <el-menu-item index="/statistics">数据统计</el-menu-item>
+          <el-sub-menu index="book">
+            <template #title>
+              <span>图书管理</span>
+            </template>
+            <el-menu-item index="/book">图书列表</el-menu-item>
+            <el-menu-item index="/book/application">借阅申请</el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="access">
+            <template #title>
+              <span>门禁管理</span>
+            </template>
+            <el-menu-item index="/access">门禁记录</el-menu-item>
+            <el-menu-item index="/access/point">门禁点管理</el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="attendance">
+            <template #title>
+              <span>考勤管理</span>
+            </template>
+            <el-menu-item index="/attendance">考勤记录</el-menu-item>
+            <el-menu-item index="/attendance/location">打卡位置管理</el-menu-item>
+          </el-sub-menu>
+          <el-menu-item index="/commute">通勤车管理</el-menu-item>
+          <el-menu-item index="/log">系统日志</el-menu-item>
         </el-sub-menu>
-        <el-menu-item index="/access">门禁管理</el-menu-item>
-        <el-menu-item index="/attendance">考勤管理</el-menu-item>
-        <el-menu-item index="/commute">通勤车管理</el-menu-item>
-        <el-menu-item index="/log">系统日志</el-menu-item>
-      </el-sub-menu>
     </template>
     
     <!-- 学生和教师菜单 -->
     <template v-else>
-      <el-menu-item index="/user/profile">
+      <el-menu-item index="/profile">
         <el-icon><User /></el-icon>
         <span>个人中心</span>
       </el-menu-item>
+      <el-menu-item index="/access/my">
+        <el-icon><Ticket /></el-icon>
+        <span>我的门禁记录</span>
+      </el-menu-item>
+      <!-- 老师菜单 -->
+      <template v-if="userRole === 'teacher'">
+        <el-menu-item index="/attendance/location">
+          <el-icon><Location /></el-icon>
+          <span>打卡位置管理</span>
+        </el-menu-item>
+      </template>
     </template>
   </el-menu>
 </template>
@@ -67,7 +90,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { HomeFilled, User, ShoppingCart, Setting } from '@element-plus/icons-vue'
+import { HomeFilled, User, ShoppingCart, Setting, Ticket, Location } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)

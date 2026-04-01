@@ -10,37 +10,34 @@ import lombok.AllArgsConstructor;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-@TableName("access_record")
+@TableName("access_point")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class AccessRecord implements Serializable {
+public class AccessPoint implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @TableField("card_id")
-    private Long cardId;
-
-    @TableField("access_point_id")
-    private Long accessPointId;
-
-    @TableField("direction")
-    private String direction;
+    @TableField("name")
+    private String name;
 
     @TableField("location")
     private String location;
 
+    @TableField("device_id")
+    private String deviceId;
+
     @TableField("status")
-    private String status;
+    private Integer status;
 
-    @TableField("access_time")
-    private LocalDateTime accessTime;
+    @TableField("create_time")
+    private LocalDateTime createTime;
 
-    @TableField("device_info")
-    private String deviceInfo;
+    @TableField("update_time")
+    private LocalDateTime updateTime;
 
     @TableField("is_deleted")
     private Integer isDeleted;

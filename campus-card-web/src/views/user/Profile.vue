@@ -174,6 +174,208 @@
             style="margin-top: 20px; justify-content: flex-end"
           />
         </el-tab-pane>
+        
+        <el-tab-pane label="门禁记录" name="access">
+          <el-form :inline="true" :model="accessForm" class="mb-4">
+            <el-form-item label="开始日期">
+              <el-date-picker v-model="accessForm.startDate" type="date" placeholder="选择开始日期" />
+            </el-form-item>
+            <el-form-item label="结束日期">
+              <el-date-picker v-model="accessForm.endDate" type="date" placeholder="选择结束日期" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="loadAccessData">查询</el-button>
+              <el-button @click="resetAccessForm">重置</el-button>
+            </el-form-item>
+          </el-form>
+          
+          <el-table :data="processedAccessList" border style="width: 100%">
+            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column label="卡号" width="120">
+              <template #default="scope">
+                {{ scope.row.cardNo || scope.row.cardId }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="direction" label="方向" width="80" />
+            <el-table-column prop="location" label="位置" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="scope">
+                <el-tag :type="getStatusType(scope.row.status)">
+                  {{ scope.row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="accessTime" label="通行时间" width="180" />
+            <el-table-column prop="deviceInfo" label="设备信息" />
+          </el-table>
+          
+          <el-pagination
+            v-model:current-page="accessPagination.page"
+            v-model:page-size="accessPagination.size"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="accessPagination.total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleAccessSizeChange"
+            @current-change="handleAccessCurrentChange"
+            style="margin-top: 20px; justify-content: flex-end"
+          />
+          
+          <div style="margin-top: 20px; text-align: center">
+            <el-button type="primary" @click="showQRCodeDialog = true">二维码开门</el-button>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="考勤打卡" name="attendance">
+          <div class="attendance-section">
+            <el-card shadow="hover" class="attendance-card">
+              <template #header>
+                <div class="card-header">
+                  <span>打卡区域</span>
+                </div>
+              </template>
+              <div class="checkin-container">
+                <div class="location-info" v-if="currentLocation">
+                  <el-icon><Position /></el-icon>
+                  <span>当前位置: {{ currentLocation }}</span>
+                </div>
+                <div class="location-error" v-else-if="locationError">
+                  <el-icon><Warning /></el-icon>
+                  <span>{{ locationError }}</span>
+                </div>
+                <div class="location-loading" v-else>
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                  <span>正在获取位置信息...</span>
+                </div>
+                <el-form-item label="打卡位置" style="margin-top: 20px; width: 100%">
+                  <el-select v-model="selectedLocation" placeholder="请选择打卡位置" style="width: 100%">
+                    <el-option 
+                      v-for="location in checkinLocations" 
+                      :key="location.id" 
+                      :label="location.locationName" 
+                      :value="location" 
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-button 
+                  type="primary" 
+                  @click="handleCheckin" 
+                  :disabled="!currentLocation || !selectedLocation || checkingIn"
+                  :loading="checkingIn"
+                  style="margin-top: 20px; width: 200px"
+                >
+                  {{ checkingIn ? '打卡中...' : '立即打卡' }}
+                </el-button>
+                <p class="checkin-tip" v-if="currentLocation && selectedLocation">点击按钮完成考勤打卡</p>
+              </div>
+            </el-card>
+            
+            <el-card shadow="hover" style="margin-top: 20px">
+              <template #header>
+                <div class="card-header">
+                  <span>考勤记录</span>
+                </div>
+              </template>
+              <el-form :inline="true" :model="attendanceForm" class="mb-4">
+                <el-form-item label="开始日期">
+                  <el-date-picker v-model="attendanceForm.startDate" type="date" placeholder="选择开始日期" />
+                </el-form-item>
+                <el-form-item label="结束日期">
+                  <el-date-picker v-model="attendanceForm.endDate" type="date" placeholder="选择结束日期" />
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="loadAttendanceData">查询</el-button>
+                  <el-button @click="resetAttendanceForm">重置</el-button>
+                </el-form-item>
+              </el-form>
+              
+              <el-table :data="attendanceList" border style="width: 100%">
+                <el-table-column prop="id" label="ID" width="80" />
+                <el-table-column prop="status" label="考勤状态" width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="getAttendanceStatusType(row.status)">
+                      {{ row.status }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="打卡地点">
+                  <template #default="{ row }">
+                    {{ row.actualLocation || '未知地点' }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="recordTime" label="打卡时间" width="180" />
+                <el-table-column prop="deviceInfo" label="设备信息" />
+              </el-table>
+              
+              <el-pagination
+                v-model:current-page="attendancePagination.page"
+                v-model:page-size="attendancePagination.size"
+                :page-sizes="[10, 20, 50, 100]"
+                :total="attendancePagination.total"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleAttendanceSizeChange"
+                @current-change="handleAttendanceCurrentChange"
+                style="margin-top: 20px; justify-content: flex-end"
+              />
+            </el-card>
+          </div>
+        </el-tab-pane>
+        
+        <!-- 二维码开门对话框 -->
+        <el-dialog
+          v-model="showQRCodeDialog"
+          title="二维码开门"
+          width="400px"
+        >
+          <div class="qr-code-container">
+            <el-form :model="qrForm" label-width="100px">
+              <el-form-item label="门禁点" required>
+                <el-select v-model="qrForm.access_point_id" placeholder="请选择门禁点" @change="handleAccessPointChange">
+                  <el-option 
+                    v-for="point in accessPoints" 
+                    :key="point.id" 
+                    :label="point.name" 
+                    :value="point.id" 
+                  />
+                </el-select>
+              </el-form-item>
+            </el-form>
+            <!-- 进出状态提示 -->
+            <div v-if="qrForm.access_point_id" class="direction-tip" :class="nextDirection === '进' ? 'direction-in' : 'direction-out'">
+              <el-icon :size="20">
+                <component :is="nextDirection === '进' ? 'ArrowRightBold' : 'ArrowLeftBold'" />
+              </el-icon>
+              <span class="direction-text">本次扫码将{{ nextDirection === '进' ? '进入' : '离开' }}该门禁点</span>
+            </div>
+            <div class="qr-code" v-if="qrCodeUrl">
+              <img :src="qrCodeUrl" alt="二维码" />
+              <p class="qr-tip">请将二维码对准门禁设备扫描</p>
+              <p class="qr-direction" :class="nextDirection === '进' ? 'direction-in' : 'direction-out'">
+                扫码后{{ nextDirection === '进' ? '进入' : '离开' }}
+              </p>
+              <!-- 二维码状态 -->
+              <div class="qr-status" :class="qrCodeStatus">
+                <el-icon :size="16">
+                  <component :is="qrCodeStatus === 'waiting' ? 'Loading' : qrCodeStatus === 'success' ? 'Check' : 'Warning'" />
+                </el-icon>
+                <span>
+                  {{ qrCodeStatus === 'waiting' ? '等待扫码...' : 
+                     qrCodeStatus === 'success' ? '扫码成功！' : 
+                     qrCodeStatus === 'failed' ? '二维码已过期' : '' }}
+                </span>
+              </div>
+            </div>
+            <div class="qr-loading" v-else>
+              <el-icon class="is-loading"><loading /></el-icon>
+              <span>请选择门禁点并点击刷新二维码</span>
+            </div>
+          </div>
+          <template #footer>
+            <span class="dialog-footer">
+              <el-button @click="showQRCodeDialog = false">关闭</el-button>
+              <el-button type="primary" @click="refreshQRCode" :disabled="!qrForm.access_point_id">刷新二维码</el-button>
+            </span>
+          </template>
+        </el-dialog>
       </el-tabs>
 
       <!-- 借阅对话框 -->
@@ -209,14 +411,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElDialog, ElForm, ElFormItem, ElSelect, ElOption, ElInput, ElDatePicker, ElButton } from 'element-plus'
+import { ElMessage, ElDialog, ElForm, ElFormItem, ElSelect, ElOption, ElInput, ElDatePicker, ElButton, ElIcon } from 'element-plus'
+import { Loading, ArrowRightBold, ArrowLeftBold, Check, Warning, Position } from '@element-plus/icons-vue'
 import { getStudentByNo } from '@/api/student'
 import { getTeacherByNo } from '@/api/teacher'
 import { getCardInfo, getCardByUserNo } from '@/api/card'
 import { getConsumeList } from '@/api/consume'
 import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, returnBook } from '@/api/book'
+import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/access'
+import { getAttendanceList, createAttendance, getActiveLocations } from '@/api/attendance'
 
 const router = useRouter()
 
@@ -302,6 +507,46 @@ const borrowDaysOptions = [
   { value: 30, label: '30天' },
   { value: 0, label: '自定义' }
 ]
+
+// 门禁记录相关
+const accessForm = reactive({
+  startDate: '',
+  endDate: ''
+})
+
+const accessList = ref([])
+const processedAccessList = ref([])
+const accessPagination = reactive({
+  page: 1,
+  size: 10,
+  total: 0
+})
+
+// 二维码开门相关
+const showQRCodeDialog = ref(false)
+const qrForm = reactive({
+  access_point_id: ''
+})
+const qrCodeUrl = ref('')
+const accessPoints = ref([])
+
+// 计算下次扫码的方向
+const nextDirection = computed(() => {
+  if (!qrForm.access_point_id || !processedAccessList.value.length) {
+    return '进'
+  }
+  
+  // 查找该门禁点最后一次通行记录
+  const lastRecord = processedAccessList.value.find(
+    record => record.accessPointId === qrForm.access_point_id
+  )
+  
+  // 如果最后一次是"进"，则下次为"出"；否则为"进"
+  if (lastRecord && lastRecord.direction === '进') {
+    return '出'
+  }
+  return '进'
+})
 
 const loadUserInfo = async () => {
   try {
@@ -522,6 +767,423 @@ const handleReturn = async (borrowRecord) => {
   }
 }
 
+const loadAccessData = async () => {
+  try {
+    if (cardInfo.id) {
+      const res = await getMyAccessRecords({
+        card_id: cardInfo.id,
+        page: accessPagination.page,
+        size: accessPagination.size
+      })
+      if (res.code === 0) {
+        accessList.value = res.data.records || []
+        accessPagination.total = res.data.total || 0
+        
+        // 处理数据，转换卡 ID 为卡号
+        const processedData = await Promise.all(
+          accessList.value.map(async (record) => {
+            try {
+              // 检查缓存
+              if (cardNoCache.value[record.cardId]) {
+                return {
+                  ...record,
+                  cardNo: cardNoCache.value[record.cardId]
+                }
+              }
+              
+              // 调用接口查询卡信息
+              const cardRes = await getCardInfo(record.cardId)
+              if (cardRes.code === 0) {
+                const cardNo = cardRes.data.cardNo
+                // 缓存结果
+                cardNoCache.value[record.cardId] = cardNo
+                return {
+                  ...record,
+                  cardNo: cardNo
+                }
+              }
+              return record
+            } catch (error) {
+              console.error('查询卡号失败:', error)
+              return record
+            }
+          })
+        )
+        
+        processedAccessList.value = processedData
+      }
+    }
+  } catch (error) {
+    console.error('加载门禁记录失败:', error)
+  }
+}
+
+const loadAccessPoints = async () => {
+  try {
+    const res = await getAccessPoints({})
+    if (res.code === 0) {
+      accessPoints.value = res.data.records || []
+    }
+  } catch (error) {
+    console.error('加载门禁点列表失败:', error)
+  }
+}
+
+const qrCodeStatus = ref('waiting') // waiting, scanning, success, failed
+const qrCodePolling = ref(null)
+
+const generateQRCode = () => {
+  if (!qrForm.access_point_id) {
+    ElMessage.warning('请选择门禁点')
+    return
+  }
+  
+  qrCodeStatus.value = 'waiting'
+  
+  // 生成二维码（包含必要的参数）
+  const qrCode = Math.random().toString(36).substring(2, 15)
+  const cardId = cardInfo.id
+  const accessPointId = qrForm.access_point_id
+  
+  // 构建二维码内容，包含必要的参数
+  const qrData = JSON.stringify({
+    card_id: cardId,
+    access_point_id: accessPointId,
+    qr_code: qrCode,
+    direction: nextDirection.value
+  })
+  
+  qrCodeUrl.value = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`
+  
+  // 模拟二维码有效期为60秒
+  setTimeout(() => {
+    if (showQRCodeDialog.value && qrCodeStatus.value === 'waiting') {
+      qrCodeUrl.value = ''
+      qrCodeStatus.value = 'failed'
+      ElMessage.warning('二维码已过期，请重新生成')
+    }
+  }, 60000)
+  
+  // 开始轮询，检查二维码是否被扫描
+  startQRCodePolling(qrCode)
+}
+
+const startQRCodePolling = (qrCode) => {
+  // 清除之前的轮询
+  if (qrCodePolling.value) {
+    clearInterval(qrCodePolling.value)
+  }
+  
+  // 每1秒轮询一次
+  qrCodePolling.value = setInterval(async () => {
+    try {
+      // 这里应该调用后端的扫码状态检查接口
+      // 由于后端没有这个接口，我们模拟一个随机的扫描结果
+      const random = Math.random()
+      if (random > 0.7) {
+        // 模拟扫码成功
+        qrCodeStatus.value = 'success'
+        clearInterval(qrCodePolling.value)
+        qrCodePolling.value = null
+        
+        // 调用后端接口，记录门禁记录
+        try {
+          const response = await createQRAccess({
+            card_id: cardInfo.id,
+            access_point_id: qrForm.access_point_id,
+            qr_code: qrCode
+          })
+          
+          if (response.code === 0) {
+            // 显示成功消息
+            ElMessage.success(`开门成功！您已${nextDirection.value === '进' ? '进入' : '离开'}该门禁点`)
+            
+            // 重新加载门禁记录
+            loadAccessData()
+          } else {
+            ElMessage.error('开门失败：' + response.message)
+          }
+        } catch (error) {
+          console.error('调用开门接口失败:', error)
+          ElMessage.error('开门失败，请稍后重试')
+        }
+        
+        // 3秒后关闭对话框
+        setTimeout(() => {
+          showQRCodeDialog.value = false
+          qrCodeUrl.value = ''
+        }, 3000)
+      }
+    } catch (error) {
+      console.error('检查扫码状态失败:', error)
+    }
+  }, 1000)
+}
+
+// 关闭对话框时清除轮询
+watch(showQRCodeDialog, (newVal) => {
+  if (!newVal && qrCodePolling.value) {
+    clearInterval(qrCodePolling.value)
+    qrCodePolling.value = null
+    qrCodeUrl.value = ''
+    qrCodeStatus.value = 'waiting'
+  }
+})
+
+const refreshQRCode = () => {
+  generateQRCode()
+}
+
+const handleAccessPointChange = () => {
+  // 门禁点改变时，清空二维码，让用户重新生成
+  qrCodeUrl.value = ''
+}
+
+const resetAccessForm = () => {
+  accessForm.startDate = ''
+  accessForm.endDate = ''
+  loadAccessData()
+}
+
+const handleAccessSizeChange = (val) => {
+  accessPagination.size = val
+  loadAccessData()
+}
+
+const handleAccessCurrentChange = (val) => {
+  accessPagination.page = val
+  loadAccessData()
+}
+
+const getStatusType = (status) => {
+  return status === '成功' ? 'success' : 'danger'
+}
+
+// 卡号缓存，避免重复查询
+const cardNoCache = ref({})
+
+const getCardNo = async (cardId) => {
+  if (!cardId) return ''
+  
+  // 检查缓存
+  if (cardNoCache.value[cardId]) {
+    return cardNoCache.value[cardId]
+  }
+  
+  try {
+    // 调用接口查询卡信息
+    const res = await getCardInfo(cardId)
+    if (res.code === 0) {
+      const cardNo = res.data.cardNo
+      // 缓存结果
+      cardNoCache.value[cardId] = cardNo
+      return cardNo
+    }
+  } catch (error) {
+    console.error('查询卡号失败:', error)
+  }
+  
+  return ''
+}
+
+// 考勤相关
+const attendanceForm = reactive({
+  startDate: '',
+  endDate: ''
+})
+
+const attendanceList = ref([])
+const attendancePagination = reactive({
+  page: 1,
+  size: 10,
+  total: 0
+})
+
+// 位置信息
+const currentLocation = ref('')
+const locationError = ref('')
+const currentLatitude = ref(null)
+const currentLongitude = ref(null)
+const checkingIn = ref(false)
+
+// 从后端获取的打卡位置
+const checkinLocations = ref([])
+// 选中的打卡位置
+const selectedLocation = ref(null)
+
+// 计算两点之间的距离（单位：米）
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // 地球半径（米）
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+// 检查是否在打卡范围内
+const isInCheckinArea = () => {
+  if (!currentLatitude.value || !currentLongitude.value || !selectedLocation.value) {
+    return false;
+  }
+
+  const location = selectedLocation.value;
+  const distance = calculateDistance(
+    currentLatitude.value,
+    currentLongitude.value,
+    location.latitude,
+    location.longitude
+  );
+  return distance <= location.radius;
+}
+
+// 获取当前位置
+const getCurrentLocation = () => {
+  if (navigator.geolocation) {
+    locationError.value = ''
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        currentLatitude.value = position.coords.latitude
+        currentLongitude.value = position.coords.longitude
+        // 这里可以调用逆地理编码API获取具体位置名称
+        currentLocation.value = `纬度: ${currentLatitude.value.toFixed(4)}, 经度: ${currentLongitude.value.toFixed(4)}`
+      },
+      (error) => {
+        locationError.value = '获取位置失败，请检查位置权限设置'
+        currentLocation.value = ''
+        currentLatitude.value = null
+        currentLongitude.value = null
+      }
+    )
+  } else {
+    locationError.value = '您的浏览器不支持地理定位'
+  }
+}
+
+// 处理打卡
+const handleCheckin = async () => {
+  if (!cardInfo.id) {
+    ElMessage.error('请先加载校园卡信息')
+    return
+  }
+  
+  if (!currentLatitude.value || !currentLongitude.value) {
+    ElMessage.error('无法获取位置信息，请检查位置权限')
+    return
+  }
+  
+  if (!selectedLocation.value) {
+    ElMessage.error('请选择打卡位置')
+    return
+  }
+  
+  // 检查是否在打卡范围内
+  if (!isInCheckinArea()) {
+    ElMessage.error('您不在允许的打卡范围内，请前往指定地点打卡')
+    return
+  }
+  
+  checkingIn.value = true
+  try {
+    const res = await createAttendance({
+      card_id: cardInfo.id,
+      location_id: selectedLocation.value.id,
+      actual_location: currentLocation.value,
+      actual_latitude: currentLatitude.value,
+      actual_longitude: currentLongitude.value,
+      device_info: navigator.userAgent
+    })
+    
+    if (res.code === 0) {
+      ElMessage.success('打卡成功！')
+      // 重新加载考勤记录
+      loadAttendanceData()
+    } else {
+      ElMessage.error(res.message || '打卡失败')
+    }
+  } catch (error) {
+    console.error('打卡失败:', error)
+    // 检查是否是重复打卡的错误
+    if (error.response && error.response.data && error.response.data.msg) {
+      ElMessage.error(error.response.data.msg)
+    } else if (error.message && error.message.includes('今日已在该位置打卡')) {
+      ElMessage.error('今日已在该位置打卡，请勿重复打卡')
+    } else {
+      ElMessage.error('打卡失败，请稍后重试')
+    }
+  } finally {
+    checkingIn.value = false
+  }
+}
+
+// 加载有效打卡位置
+const loadActiveLocations = async () => {
+  try {
+    const res = await getActiveLocations()
+    if (res.code === 0) {
+      checkinLocations.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载打卡位置失败:', error)
+  }
+}
+
+// 加载考勤记录
+const loadAttendanceData = async () => {
+  try {
+    if (cardInfo.id) {
+      const res = await getAttendanceList({
+        card_id: cardInfo.id,
+        start_date: attendanceForm.startDate ? new Date(attendanceForm.startDate).toISOString().split('T')[0] : '',
+        end_date: attendanceForm.endDate ? new Date(attendanceForm.endDate).toISOString().split('T')[0] : '',
+        page: attendancePagination.page,
+        size: attendancePagination.size
+      })
+      if (res.code === 0) {
+        attendanceList.value = res.data.records || []
+        attendancePagination.total = res.data.total || 0
+      }
+    }
+  } catch (error) {
+    console.error('加载考勤记录失败:', error)
+  }
+}
+
+// 重置考勤表单
+const resetAttendanceForm = () => {
+  attendanceForm.startDate = ''
+  attendanceForm.endDate = ''
+  loadAttendanceData()
+}
+
+// 处理考勤分页
+const handleAttendanceSizeChange = (val) => {
+  attendancePagination.size = val
+  loadAttendanceData()
+}
+
+const handleAttendanceCurrentChange = (val) => {
+  attendancePagination.page = val
+  loadAttendanceData()
+}
+
+// 获取考勤状态类型
+const getAttendanceStatusType = (status) => {
+  const map = {
+    '正常': 'success',
+    '迟到': 'warning',
+    '早退': 'warning',
+    '缺勤': 'danger'
+  }
+  return map[status] || 'info'
+}
+
 const logout = () => {
   // 清除本地存储中的用户信息和token
   localStorage.removeItem('token')
@@ -531,10 +1193,23 @@ const logout = () => {
   router.push('/login')
 }
 
+// 监听二维码开门对话框的显示
+watch(() => showQRCodeDialog.value, (newVal) => {
+  if (newVal) {
+    qrCodeUrl.value = ''
+    qrForm.access_point_id = ''
+    loadAccessPoints()
+  }
+})
+
 onMounted(async () => {
   await loadUserInfo()
   await loadCardInfo()
   loadConsumeData()
+  loadAccessData()
+  loadAttendanceData()
+  loadActiveLocations()
+  getCurrentLocation()
   if (userInfo.role === 'student') {
     loadBorrowData()
     loadBookData()
@@ -555,5 +1230,162 @@ onMounted(async () => {
 
 .mb-4 {
   margin-bottom: 16px;
+}
+
+.qr-code-container {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.qr-code {
+  margin-top: 20px;
+}
+
+.qr-code img {
+  width: 200px;
+  height: 200px;
+}
+
+.qr-tip {
+  margin-top: 10px;
+  color: #606266;
+}
+
+.qr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 40px;
+}
+
+.qr-loading .el-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+/* 进出状态提示样式 */
+.direction-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 15px 0;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.direction-in {
+  background-color: #f0f9ff;
+  color: #409eff;
+  border: 1px solid #409eff;
+}
+
+.direction-out {
+  background-color: #fff0f0;
+  color: #f56c6c;
+  border: 1px solid #f56c6c;
+}
+
+.direction-text {
+  margin-left: 8px;
+}
+
+.qr-direction {
+  margin-top: 10px;
+  padding: 5px 15px;
+  border-radius: 4px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+/* 二维码状态样式 */
+.qr-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  padding: 5px 15px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.qr-status.waiting {
+  background-color: #f5f7fa;
+  color: #409eff;
+  border: 1px solid #d9ecff;
+}
+
+.qr-status.success {
+  background-color: #f0f9ff;
+  color: #67c23a;
+  border: 1px solid #e1f5d6;
+}
+
+.qr-status.failed {
+  background-color: #fff0f0;
+  color: #f56c6c;
+  border: 1px solid #fbc4c4;
+}
+
+.qr-status span {
+  margin-left: 8px;
+}
+
+/* 考勤打卡相关样式 */
+.attendance-section {
+  padding: 20px 0;
+}
+
+.attendance-card {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.checkin-container {
+  text-align: center;
+  padding: 30px 0;
+}
+
+.location-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f9ff;
+  color: #409eff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.location-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff0f0;
+  color: #f56c6c;
+  padding: 10px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.location-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  margin-bottom: 20px;
+}
+
+.checkin-tip {
+  margin-top: 10px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.location-info span,
+.location-error span,
+.location-loading span {
+  margin-left: 8px;
 }
 </style>

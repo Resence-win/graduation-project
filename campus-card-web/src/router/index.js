@@ -20,6 +20,12 @@ const routes = [
         meta: { title: '首页', requiresAdmin: true }
       },
       {
+        path: 'profile',
+        name: 'UserProfile',
+        component: () => import('@/views/user/Profile.vue'),
+        meta: { title: '个人中心', requiresAuth: true }
+      },
+      {
         path: 'student',
         name: 'Student',
         component: () => import('@/views/student/StudentList.vue'),
@@ -82,14 +88,32 @@ const routes = [
       {
         path: 'access',
         name: 'Access',
-        component: () => import('@/views/access/AccessList.vue'),
-        meta: { title: '门禁管理', requiresAdmin: true }
+        component: () => import('@/views/access/AccessRecordList.vue'),
+        meta: { title: '门禁记录管理', requiresAdmin: true }
+      },
+      {
+        path: 'access/point',
+        name: 'AccessPoint',
+        component: () => import('@/views/access/AccessPointList.vue'),
+        meta: { title: '门禁点管理', requiresAdmin: true }
+      },
+      {
+        path: 'access/my',
+        name: 'MyAccess',
+        component: () => import('@/views/access/MyAccessRecord.vue'),
+        meta: { title: '我的门禁记录' }
       },
       {
         path: 'attendance',
         name: 'Attendance',
         component: () => import('@/views/attendance/AttendanceList.vue'),
         meta: { title: '考勤管理', requiresAdmin: true }
+      },
+      {
+        path: 'attendance/location',
+        name: 'AttendanceLocation',
+        component: () => import('@/views/attendance/AttendanceLocation.vue'),
+        meta: { title: '打卡位置管理', requiresAdmin: false }
       },
       {
         path: 'commute',
@@ -104,12 +128,6 @@ const routes = [
         meta: { title: '系统日志', requiresAdmin: true }
       }
     ]
-  },
-  {
-    path: '/user/profile',
-    name: 'UserProfile',
-    component: () => import('@/views/user/Profile.vue'),
-    meta: { title: '个人中心', requiresAuth: true }
   }
 ]
 
@@ -132,8 +150,10 @@ router.beforeEach((to, from, next) => {
     // 根据用户角色跳转到对应页面
     if (user && user.role === 'admin') {
       next('/')
+    } else if (user && user.role === 'teacher') {
+      next('/attendance/location')
     } else {
-      next('/user/profile')
+      next('/profile')
     }
     return
   }
@@ -141,7 +161,7 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAdmin && user && user.role !== 'admin') {
     // 非管理员尝试访问管理员页面，跳转到个人中心
     ElMessage.warning('无权限访问该页面')
-    next('/user/profile')
+    next('/profile')
     return
   }
   

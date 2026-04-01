@@ -280,25 +280,56 @@ COMMENT ON COLUMN merchant.update_time IS '更新时间';
 COMMENT ON COLUMN merchant.is_deleted IS '是否删除';
 
 -- ========================
--- 12. 门禁记录
+-- 12. 门禁点表
+-- ========================
+DROP TABLE IF EXISTS access_point;
+CREATE TABLE access_point (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    location VARCHAR(200),
+    device_id VARCHAR(50),
+    status INT DEFAULT 1,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE access_point IS '门禁点表';
+COMMENT ON COLUMN access_point.id IS '主键ID';
+COMMENT ON COLUMN access_point.name IS '门禁点名称';
+COMMENT ON COLUMN access_point.location IS '位置';
+COMMENT ON COLUMN access_point.device_id IS '设备ID';
+COMMENT ON COLUMN access_point.status IS '状态(1正常)';
+COMMENT ON COLUMN access_point.create_time IS '创建时间';
+COMMENT ON COLUMN access_point.update_time IS '更新时间';
+COMMENT ON COLUMN access_point.is_deleted IS '是否删除(0否1是)';
+
+-- ========================
+-- 13. 门禁记录
 -- ========================
 DROP TABLE IF EXISTS access_record;
 CREATE TABLE access_record (
     id BIGSERIAL PRIMARY KEY,
     card_id BIGINT,
+    access_point_id BIGINT,
     direction VARCHAR(10),
     location VARCHAR(100),
+    status VARCHAR(20),
     access_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    device_info VARCHAR(255),
     is_deleted INT DEFAULT 0
 );
 
 COMMENT ON TABLE access_record IS '门禁记录表';
 COMMENT ON COLUMN access_record.id IS '主键ID';
 COMMENT ON COLUMN access_record.card_id IS '卡ID';
+COMMENT ON COLUMN access_record.access_point_id IS '门禁点ID';
 COMMENT ON COLUMN access_record.direction IS '进出方向';
 COMMENT ON COLUMN access_record.location IS '位置';
+COMMENT ON COLUMN access_record.status IS '状态(成功/失败/无效卡等)';
 COMMENT ON COLUMN access_record.access_time IS '通行时间';
-COMMENT ON COLUMN access_record.is_deleted IS '是否删除';
+COMMENT ON COLUMN access_record.device_info IS '设备信息';
+COMMENT ON COLUMN access_record.is_deleted IS '是否删除(0否1是)';
 
 -- ========================
 -- 13. 图书表
@@ -386,13 +417,53 @@ COMMENT ON COLUMN borrow_record.create_time IS '创建时间';
 COMMENT ON COLUMN borrow_record.is_deleted IS '是否删除';
 
 -- ========================
--- 16. 考勤记录
+-- 16. 打卡位置
+-- ========================
+DROP TABLE IF EXISTS attendance_location;
+CREATE TABLE attendance_location (
+    id BIGSERIAL PRIMARY KEY,
+    teacher_id BIGINT,
+    location_name VARCHAR(200),
+    location VARCHAR(200),
+    latitude DECIMAL(10, 6),
+    longitude DECIMAL(10, 6),
+    radius INT DEFAULT 50,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    status INT DEFAULT 1,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE attendance_location IS '打卡位置表';
+COMMENT ON COLUMN attendance_location.id IS '主键ID';
+COMMENT ON COLUMN attendance_location.teacher_id IS '老师ID';
+COMMENT ON COLUMN attendance_location.location_name IS '位置名称';
+COMMENT ON COLUMN attendance_location.location IS '位置描述';
+COMMENT ON COLUMN attendance_location.latitude IS '纬度';
+COMMENT ON COLUMN attendance_location.longitude IS '经度';
+COMMENT ON COLUMN attendance_location.radius IS '打卡半径(米)';
+COMMENT ON COLUMN attendance_location.start_time IS '开始时间';
+COMMENT ON COLUMN attendance_location.end_time IS '结束时间';
+COMMENT ON COLUMN attendance_location.status IS '状态(1: 有效, 0: 无效)';
+COMMENT ON COLUMN attendance_location.create_time IS '创建时间';
+COMMENT ON COLUMN attendance_location.update_time IS '更新时间';
+COMMENT ON COLUMN attendance_location.is_deleted IS '是否删除';
+
+-- ========================
+-- 17. 考勤记录
 -- ========================
 DROP TABLE IF EXISTS attendance_record;
 CREATE TABLE attendance_record (
     id BIGSERIAL PRIMARY KEY,
     card_id BIGINT,
+    location_id BIGINT,
     status VARCHAR(20),
+    actual_location VARCHAR(200),
+    actual_latitude DECIMAL(10, 6),
+    actual_longitude DECIMAL(10, 6),
+    device_info VARCHAR(255),
     record_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted INT DEFAULT 0
 );
@@ -400,12 +471,17 @@ CREATE TABLE attendance_record (
 COMMENT ON TABLE attendance_record IS '考勤记录表';
 COMMENT ON COLUMN attendance_record.id IS '主键ID';
 COMMENT ON COLUMN attendance_record.card_id IS '卡ID';
+COMMENT ON COLUMN attendance_record.location_id IS '打卡位置ID';
 COMMENT ON COLUMN attendance_record.status IS '考勤状态';
+COMMENT ON COLUMN attendance_record.actual_location IS '实际打卡地点';
+COMMENT ON COLUMN attendance_record.actual_latitude IS '实际纬度';
+COMMENT ON COLUMN attendance_record.actual_longitude IS '实际经度';
+COMMENT ON COLUMN attendance_record.device_info IS '设备信息';
 COMMENT ON COLUMN attendance_record.record_time IS '记录时间';
 COMMENT ON COLUMN attendance_record.is_deleted IS '是否删除';
 
 -- ========================
--- 17. 通勤车记录
+-- 18. 通勤车记录
 -- ========================
 DROP TABLE IF EXISTS commute_record;
 CREATE TABLE commute_record (
@@ -519,6 +595,10 @@ CREATE INDEX idx_merchant_status ON merchant(status);
 -- 辅助模块索引
 CREATE INDEX idx_access_card_id ON access_record(card_id);
 CREATE INDEX idx_access_time ON access_record(access_time);
+CREATE INDEX idx_access_point_id ON access_record(access_point_id);
+CREATE INDEX idx_access_status ON access_record(status);
+CREATE INDEX idx_access_point_status ON access_point(status);
+CREATE INDEX idx_access_point_device_id ON access_point(device_id);
 CREATE INDEX idx_borrow_card_id ON borrow_record(card_id);
 CREATE INDEX idx_borrow_book_id ON borrow_record(book_id);
 CREATE INDEX idx_borrow_status ON borrow_record(status);

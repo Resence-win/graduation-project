@@ -127,15 +127,18 @@ const handleLogin = async () => {
       
       // 根据角色跳转到不同页面
       console.log('角色:', loginForm.role)
-      console.log('跳转路径:', loginForm.role === 'admin' ? '/' : '/user/profile')
       try {
         if (loginForm.role === 'admin') {
           console.log('准备跳转到首页')
           router.push('/')
           console.log('跳转完成')
+        } else if (loginForm.role === 'teacher') {
+          console.log('准备跳转到打卡位置管理')
+          router.push('/attendance/location')
+          console.log('跳转完成')
         } else {
           console.log('准备跳转到个人中心')
-          router.push('/user/profile')
+          router.push('/profile')
           console.log('跳转完成')
         }
       } catch (error) {

@@ -22,6 +22,11 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   response => {
+    // 对于 blob 类型的响应，直接返回原始响应
+    if (response.config.responseType === 'blob') {
+      return response
+    }
+    
     const res = response.data
     
     if (res.code === 0) {
