@@ -72,9 +72,9 @@
         <el-icon><User /></el-icon>
         <span>个人中心</span>
       </el-menu-item>
-      <el-menu-item index="/access/my">
-        <el-icon><Ticket /></el-icon>
-        <span>我的门禁记录</span>
+      <el-menu-item index="/commute/student">
+        <el-icon><Van /></el-icon>
+        <span>通勤车查询</span>
       </el-menu-item>
       <!-- 老师菜单 -->
       <template v-if="userRole === 'teacher'">
@@ -90,7 +90,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { HomeFilled, User, ShoppingCart, Setting, Ticket, Location } from '@element-plus/icons-vue'
+import { HomeFilled, User, ShoppingCart, Setting, Ticket, Location, Van } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)

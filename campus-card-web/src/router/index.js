@@ -122,6 +122,12 @@ const routes = [
         meta: { title: '通勤车管理', requiresAdmin: true }
       },
       {
+        path: 'commute/student',
+        name: 'StudentCommute',
+        component: () => import('@/views/commute/StudentCommute.vue'),
+        meta: { title: '通勤车查询' }
+      },
+      {
         path: 'log',
         name: 'Log',
         component: () => import('@/views/log/LogList.vue'),

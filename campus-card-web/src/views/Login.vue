@@ -117,8 +117,10 @@ const handleLogin = async () => {
     
     if (res.code === 0) {
       const userInfo = {
-        ...res.data,
-        role: loginForm.role
+        ...res.data.user,
+        role: loginForm.role,
+        cardId: res.data.cardId,
+        cardNo: res.data.cardNo
       }
       console.log('用户信息:', userInfo)
       localStorage.setItem('token', 'mock-token-' + Date.now())

@@ -8,25 +8,25 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("commute_record")
-public class CommuteRecord {
+@TableName("commute_station")
+public class CommuteStation {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long cardId;
+    private String stationName;
 
-    private Long routeId;
+    private String location;
 
-    private Long vehicleId;
+    private Double latitude;
 
-    private Long scheduleId;
-
-    private String seatNumber;
-
-    private LocalDateTime rideTime;
+    private Double longitude;
 
     private Integer status;
+
+    private LocalDateTime createTime;
+
+    private LocalDateTime updateTime;
 
     private Integer isDeleted;
 }

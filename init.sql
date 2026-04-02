@@ -481,13 +481,127 @@ COMMENT ON COLUMN attendance_record.record_time IS '记录时间';
 COMMENT ON COLUMN attendance_record.is_deleted IS '是否删除';
 
 -- ========================
--- 18. 通勤车记录
+-- 18. 通勤车线路表
+-- ========================
+DROP TABLE IF EXISTS commute_route;
+CREATE TABLE commute_route (
+    id BIGSERIAL PRIMARY KEY,
+    route_name VARCHAR(100) NOT NULL,
+    start_station VARCHAR(100),
+    end_station VARCHAR(100),
+    total_distance DECIMAL(10, 2),
+    total_time INT, -- 全程时间（分钟）
+    status INT DEFAULT 1,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE commute_route IS '通勤车线路表';
+COMMENT ON COLUMN commute_route.id IS '主键ID';
+COMMENT ON COLUMN commute_route.route_name IS '线路名称';
+COMMENT ON COLUMN commute_route.start_station IS '起点站';
+COMMENT ON COLUMN commute_route.end_station IS '终点站';
+COMMENT ON COLUMN commute_route.total_distance IS '全程距离（公里）';
+COMMENT ON COLUMN commute_route.total_time IS '全程时间（分钟）';
+COMMENT ON COLUMN commute_route.status IS '状态(1正常)';
+COMMENT ON COLUMN commute_route.create_time IS '创建时间';
+COMMENT ON COLUMN commute_route.update_time IS '更新时间';
+COMMENT ON COLUMN commute_route.is_deleted IS '是否删除(0否1是)';
+
+-- ========================
+-- 19. 通勤车车辆表
+-- ========================
+DROP TABLE IF EXISTS commute_vehicle;
+CREATE TABLE commute_vehicle (
+    id BIGSERIAL PRIMARY KEY,
+    plate_number VARCHAR(20) UNIQUE NOT NULL,
+    vehicle_type VARCHAR(50),
+    seat_count INT,
+    status INT DEFAULT 1, -- 1: 正常, 2: 维护, 3: 停用
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE commute_vehicle IS '通勤车车辆表';
+COMMENT ON COLUMN commute_vehicle.id IS '主键ID';
+COMMENT ON COLUMN commute_vehicle.plate_number IS '车牌号';
+COMMENT ON COLUMN commute_vehicle.vehicle_type IS '车辆类型';
+COMMENT ON COLUMN commute_vehicle.seat_count IS '座位数';
+COMMENT ON COLUMN commute_vehicle.status IS '状态(1: 正常, 2: 维护, 3: 停用)';
+COMMENT ON COLUMN commute_vehicle.create_time IS '创建时间';
+COMMENT ON COLUMN commute_vehicle.update_time IS '更新时间';
+COMMENT ON COLUMN commute_vehicle.is_deleted IS '是否删除(0否1是)';
+
+-- ========================
+-- 20. 通勤车站点表
+-- ========================
+DROP TABLE IF EXISTS commute_station;
+CREATE TABLE commute_station (
+    id BIGSERIAL PRIMARY KEY,
+    station_name VARCHAR(100) NOT NULL,
+    location VARCHAR(200),
+    latitude DECIMAL(10, 6),
+    longitude DECIMAL(10, 6),
+    status INT DEFAULT 1,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE commute_station IS '通勤车站点表';
+COMMENT ON COLUMN commute_station.id IS '主键ID';
+COMMENT ON COLUMN commute_station.station_name IS '站点名称';
+COMMENT ON COLUMN commute_station.location IS '站点位置';
+COMMENT ON COLUMN commute_station.latitude IS '纬度';
+COMMENT ON COLUMN commute_station.longitude IS '经度';
+COMMENT ON COLUMN commute_station.status IS '状态(1正常)';
+COMMENT ON COLUMN commute_station.create_time IS '创建时间';
+COMMENT ON COLUMN commute_station.update_time IS '更新时间';
+COMMENT ON COLUMN commute_station.is_deleted IS '是否删除(0否1是)';
+
+-- ========================
+-- 22. 通勤车时刻表
+-- ========================
+DROP TABLE IF EXISTS commute_schedule;
+CREATE TABLE commute_schedule (
+    id BIGSERIAL PRIMARY KEY,
+    route_id BIGINT,
+    vehicle_id BIGINT,
+    departure_time TIME NOT NULL,
+    frequency VARCHAR(50), -- 班次频率，如：每天、工作日、周末
+    start_date DATE,
+    end_date DATE,
+    status INT DEFAULT 1,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE commute_schedule IS '通勤车时刻表';
+COMMENT ON COLUMN commute_schedule.id IS '主键ID';
+COMMENT ON COLUMN commute_schedule.route_id IS '线路ID';
+COMMENT ON COLUMN commute_schedule.vehicle_id IS '车辆ID';
+COMMENT ON COLUMN commute_schedule.departure_time IS '发车时间';
+COMMENT ON COLUMN commute_schedule.frequency IS '班次频率';
+COMMENT ON COLUMN commute_schedule.start_date IS '开始日期';
+COMMENT ON COLUMN commute_schedule.end_date IS '结束日期';
+COMMENT ON COLUMN commute_schedule.status IS '状态(1正常)';
+COMMENT ON COLUMN commute_schedule.create_time IS '创建时间';
+COMMENT ON COLUMN commute_schedule.update_time IS '更新时间';
+COMMENT ON COLUMN commute_schedule.is_deleted IS '是否删除(0否1是)';
+
+-- ========================
+-- 23. 通勤车记录
 -- ========================
 DROP TABLE IF EXISTS commute_record;
 CREATE TABLE commute_record (
     id BIGSERIAL PRIMARY KEY,
     card_id BIGINT,
     route_id BIGINT,
+    vehicle_id BIGINT,
+    schedule_id BIGINT,
     seat_number VARCHAR(10),
     ride_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status INT DEFAULT 1,
@@ -498,6 +612,8 @@ COMMENT ON TABLE commute_record IS '通勤车记录表';
 COMMENT ON COLUMN commute_record.id IS '主键ID';
 COMMENT ON COLUMN commute_record.card_id IS '卡ID';
 COMMENT ON COLUMN commute_record.route_id IS '路线ID';
+COMMENT ON COLUMN commute_record.vehicle_id IS '车辆ID';
+COMMENT ON COLUMN commute_record.schedule_id IS '班次ID';
 COMMENT ON COLUMN commute_record.seat_number IS '座位号';
 COMMENT ON COLUMN commute_record.ride_time IS '乘车时间';
 COMMENT ON COLUMN commute_record.status IS '状态';
@@ -609,11 +725,50 @@ CREATE INDEX idx_borrow_application_status ON borrow_application(status);
 CREATE INDEX idx_borrow_application_time ON borrow_application(application_time);
 CREATE INDEX idx_attendance_card_id ON attendance_record(card_id);
 CREATE INDEX idx_attendance_time ON attendance_record(record_time);
-CREATE INDEX idx_commute_card_id ON commute_record(card_id);
-CREATE INDEX idx_commute_route_id ON commute_record(route_id);
-CREATE INDEX idx_commute_time ON commute_record(ride_time);
+-- 通勤车相关索引
+CREATE INDEX idx_commute_route_status ON commute_route(status);
+CREATE INDEX idx_commute_vehicle_plate ON commute_vehicle(plate_number);
+CREATE INDEX idx_commute_vehicle_status ON commute_vehicle(status);
+CREATE INDEX idx_commute_station_name ON commute_station(station_name);
+CREATE INDEX idx_commute_station_status ON commute_station(status);
+CREATE INDEX idx_commute_schedule_route ON commute_schedule(route_id);
+CREATE INDEX idx_commute_schedule_vehicle ON commute_schedule(vehicle_id);
+CREATE INDEX idx_commute_schedule_departure ON commute_schedule(departure_time);
+CREATE INDEX idx_commute_schedule_status ON commute_schedule(status);
+CREATE INDEX idx_commute_record_card_id ON commute_record(card_id);
+CREATE INDEX idx_commute_record_route_id ON commute_record(route_id);
+CREATE INDEX idx_commute_record_vehicle_id ON commute_record(vehicle_id);
+CREATE INDEX idx_commute_record_time ON commute_record(ride_time);
 
 -- 系统日志索引
 CREATE INDEX idx_operation_log_operator_id ON operation_log(operator_id);
 CREATE INDEX idx_operation_log_type ON operation_log(operation_type);
 CREATE INDEX idx_operation_log_time ON operation_log(create_time);
+
+-- ========================
+-- 通勤车测试数据
+-- ========================
+
+-- 插入测试站点
+INSERT INTO commute_station (station_name, location, latitude, longitude, status, create_time, is_deleted) VALUES 
+('新校区', '新校区北门', 35.490429, 114.609707, 1, CURRENT_TIMESTAMP, 0),
+('老校区', '老校区东门', 35.500000, 114.620000, 1, CURRENT_TIMESTAMP, 0),
+('图书馆', '图书馆门口', 35.495000, 114.615000, 1, CURRENT_TIMESTAMP, 0),
+('教学楼', '教学楼门口', 35.498000, 114.618000, 1, CURRENT_TIMESTAMP, 0);
+
+-- 插入测试车辆
+INSERT INTO commute_vehicle (plate_number, vehicle_type, seat_count, status, create_time, is_deleted) VALUES 
+('豫A12345', '大巴车', 45, 1, CURRENT_TIMESTAMP, 0),
+('豫A67890', '中巴车', 30, 1, CURRENT_TIMESTAMP, 0);
+
+-- 插入测试线路
+INSERT INTO commute_route (route_name, start_station, end_station, total_distance, total_time, status, create_time, is_deleted) VALUES 
+('13线', '新校区', '老校区', 1679.73, 3359, 1, CURRENT_TIMESTAMP, 0),
+('14线', '图书馆', '教学楼', 1000.00, 2000, 1, CURRENT_TIMESTAMP, 0);
+
+-- 插入测试时刻表
+INSERT INTO commute_schedule (route_id, vehicle_id, departure_time, frequency, start_date, end_date, status, create_time, is_deleted) VALUES 
+(1, 1, '07:30:00', '每天', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', 1, CURRENT_TIMESTAMP, 0),
+(1, 2, '13:18:02', '每天', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', 1, CURRENT_TIMESTAMP, 0),
+(2, 1, '08:00:00', '每天', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', 1, CURRENT_TIMESTAMP, 0),
+(2, 2, '14:00:00', '每天', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', 1, CURRENT_TIMESTAMP, 0);

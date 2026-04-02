@@ -9,6 +9,7 @@ import com.qms.campuscard.service.CommuteRecordService;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
+import java.time.LocalDateTime;
 
 @Service
 public class CommuteRecordServiceImpl implements CommuteRecordService {
@@ -38,5 +39,13 @@ public class CommuteRecordServiceImpl implements CommuteRecordService {
         queryWrapper.eq("is_deleted", 0);
         queryWrapper.orderByDesc("ride_time");
         return commuteRecordMapper.selectPage(pageParam, queryWrapper);
+    }
+
+    @Override
+    public boolean addCommuteRecord(CommuteRecord record) {
+        record.setIsDeleted(0);
+        record.setStatus(1);
+        record.setRideTime(LocalDateTime.now());
+        return commuteRecordMapper.insert(record) > 0;
     }
 }

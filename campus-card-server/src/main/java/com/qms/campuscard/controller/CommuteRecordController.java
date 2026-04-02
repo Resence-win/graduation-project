@@ -6,12 +6,16 @@ import com.qms.campuscard.common.Result;
 import com.qms.campuscard.entity.CommuteRecord;
 import com.qms.campuscard.service.CommuteRecordService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.annotation.Resource;
 
 @RestController
+@RequestMapping("/api/commute")
 public class CommuteRecordController {
 
     @Resource
@@ -20,15 +24,17 @@ public class CommuteRecordController {
     @Resource
     private LogUtil logUtil;
 
-    @GetMapping("/api/commute/list")
+    @GetMapping("/list")
     public Result<IPage<CommuteRecord>> getCommuteRecords(
-            @RequestParam(required = false) Long card_id,
-            @RequestParam(required = false) Long route_id,
+            @RequestParam(required = false) Long cardId,
+            @RequestParam(required = false) Long routeId,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
-        IPage<CommuteRecord> records = commuteRecordService.getCommuteRecords(card_id, route_id, page, size);
+        IPage<CommuteRecord> records = commuteRecordService.getCommuteRecords(cardId, routeId, page, size);
         // 记录日志
-        logUtil.recordLog(1L, "查询", "commute_record", null, "查询通勤记录，卡号：" + (card_id != null ? card_id : "全部"));
+        logUtil.recordLog(1L, "查询", "commute_record", null, "查询通勤记录，卡号：" + (cardId != null ? cardId : "全部"));
         return Result.success(records);
     }
+
+
 }

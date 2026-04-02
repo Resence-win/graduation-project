@@ -5,28 +5,34 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Data
-@TableName("commute_record")
-public class CommuteRecord {
+@TableName("commute_schedule")
+public class CommuteSchedule {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-
-    private Long cardId;
 
     private Long routeId;
 
     private Long vehicleId;
 
-    private Long scheduleId;
+    private LocalTime departureTime;
 
-    private String seatNumber;
+    private String frequency;
 
-    private LocalDateTime rideTime;
+    private LocalDate startDate;
+
+    private LocalDate endDate;
 
     private Integer status;
+
+    private LocalDateTime createTime;
+
+    private LocalDateTime updateTime;
 
     private Integer isDeleted;
 }
