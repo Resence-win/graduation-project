@@ -5,7 +5,6 @@ import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
 import com.qms.campuscard.dto.RechargeRequest;
 import com.qms.campuscard.dto.RechargeByCardNoRequest;
-import com.qms.campuscard.entity.RechargeRecord;
 import com.qms.campuscard.service.RechargeService;
 import org.springframework.web.bind.annotation.*;
 

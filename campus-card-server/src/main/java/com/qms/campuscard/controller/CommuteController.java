@@ -12,7 +12,6 @@ import com.qms.campuscard.service.*;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/commute")

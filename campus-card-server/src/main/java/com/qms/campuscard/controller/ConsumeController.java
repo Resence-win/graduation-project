@@ -5,7 +5,6 @@ import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
 import com.qms.campuscard.dto.ConsumeRequest;
 import com.qms.campuscard.dto.ConsumeByCardNoRequest;
-import com.qms.campuscard.entity.ConsumeRecord;
 import com.qms.campuscard.service.ConsumeService;
 import org.springframework.web.bind.annotation.*;
 
