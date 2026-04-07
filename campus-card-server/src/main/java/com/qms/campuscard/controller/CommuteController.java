@@ -12,6 +12,7 @@ import com.qms.campuscard.service.*;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/commute")
@@ -242,6 +243,38 @@ public class CommuteController {
         } else {
             return Result.error("删除时刻表失败");
         }
+    }
+
+    // 获取所有线路（无分页）
+    @GetMapping("/route/all")
+    public Result<List<CommuteRoute>> getAllRoutes() {
+        List<CommuteRoute> routes = commuteRouteService.getAllRoutes();
+        logUtil.recordLog(1L, "查询", "commute_route", null, "获取所有线路");
+        return Result.success(routes);
+    }
+
+    // 获取所有车辆（无分页）
+    @GetMapping("/vehicle/all")
+    public Result<List<CommuteVehicle>> getAllVehicles() {
+        List<CommuteVehicle> vehicles = commuteVehicleService.getAllVehicles();
+        logUtil.recordLog(1L, "查询", "commute_vehicle", null, "获取所有车辆");
+        return Result.success(vehicles);
+    }
+
+    // 获取所有班次（无分页）
+    @GetMapping("/schedule/all")
+    public Result<List<CommuteSchedule>> getAllSchedules() {
+        List<CommuteSchedule> schedules = commuteScheduleService.getAllSchedules();
+        logUtil.recordLog(1L, "查询", "commute_schedule", null, "获取所有班次");
+        return Result.success(schedules);
+    }
+
+    // 根据线路ID获取班次列表
+    @GetMapping("/schedule/route/{routeId}")
+    public Result<List<CommuteSchedule>> getSchedulesByRouteId(@PathVariable Long routeId) {
+        List<CommuteSchedule> schedules = commuteScheduleService.getSchedulesByRouteId(routeId);
+        logUtil.recordLog(1L, "查询", "commute_schedule", null, "获取线路" + routeId + "的班次");
+        return Result.success(schedules);
     }
     
     // 添加乘车记录

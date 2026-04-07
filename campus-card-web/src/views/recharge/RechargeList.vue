@@ -114,7 +114,7 @@ const loadData = async () => {
     const res = await getRechargeList({
       page: pagination.page,
       size: pagination.size,
-      ...searchForm
+      card_no: searchForm.cardNo
     })
     if (res.code === 0) {
       tableData.value = res.data.records || []

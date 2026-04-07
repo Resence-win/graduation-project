@@ -13,6 +13,7 @@ import com.qms.campuscard.mapper.AccountMapper;
 import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.RechargeRecordMapper;
 import com.qms.campuscard.service.RechargeService;
+import com.qms.campuscard.util.RedisUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,8 @@ import java.time.LocalDateTime;
 
 @Service
 public class RechargeServiceImpl implements RechargeService {
+
+    private static final String ACCOUNT_BALANCE_KEY_PREFIX = "account:balance:";
 
     @Resource
     private AccountMapper accountMapper;
@@ -34,6 +37,9 @@ public class RechargeServiceImpl implements RechargeService {
 
     @Resource
     private CampusCardMapper campusCardMapper;
+
+    @Resource
+    private RedisUtil redisUtil;
 
     @Override
     @Transactional
@@ -88,6 +94,9 @@ public class RechargeServiceImpl implements RechargeService {
         accountFlow.setIsDeleted(0);
         accountFlow.setCreateTime(LocalDateTime.now());
         accountFlowMapper.insert(accountFlow);
+
+        // 清除余额缓存
+        redisUtil.del(ACCOUNT_BALANCE_KEY_PREFIX + cardId);
 
         return true;
     }
@@ -168,5 +177,29 @@ public class RechargeServiceImpl implements RechargeService {
             
             return dto;
         });
+    }
+    
+    @Override
+    public IPage<RechargeRecordDTO> getRechargeRecordsByCardNo(String cardNo, Integer page, Integer size) {
+        if (page == null || page < 1) {
+            page = 1;
+        }
+        if (size == null || size < 1) {
+            size = 10;
+        }
+        
+        // 根据卡号查询校园卡
+        QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+        cardQuery.eq("card_no", cardNo);
+        cardQuery.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+        
+        if (campusCard == null) {
+            // 校园卡不存在，返回空页
+            return new Page<>(page, size);
+        }
+        
+        // 调用现有的方法查询
+        return getRechargeRecords(campusCard.getId(), page, size);
     }
 }

@@ -9,4 +9,5 @@ public interface RechargeService {
     boolean rechargeByCardNo(String cardNo, java.math.BigDecimal amount, String rechargeType, Long operatorId, String operatorName);
 
     IPage<com.qms.campuscard.dto.RechargeRecordDTO> getRechargeRecords(Long cardId, Integer page, Integer size);
+    IPage<com.qms.campuscard.dto.RechargeRecordDTO> getRechargeRecordsByCardNo(String cardNo, Integer page, Integer size);
 }

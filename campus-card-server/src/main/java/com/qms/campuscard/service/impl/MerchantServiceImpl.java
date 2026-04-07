@@ -9,6 +9,7 @@ import com.qms.campuscard.dto.MerchantDTO;
 import com.qms.campuscard.mapper.MerchantMapper;
 import com.qms.campuscard.mapper.MerchantTypeMapper;
 import com.qms.campuscard.service.MerchantService;
+import com.qms.campuscard.util.RedisUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,11 +24,18 @@ import java.util.UUID;
 @Service
 public class MerchantServiceImpl implements MerchantService {
 
+    private static final String MERCHANT_INFO_KEY_PREFIX = "merchant:info:";
+    private static final String MERCHANT_TYPE_LIST_KEY = "merchant:type:list";
+    private static final long CACHE_EXPIRE_TIME = 3600;
+
     @Resource
     private MerchantMapper merchantMapper;
 
     @Resource
     private MerchantTypeMapper merchantTypeMapper;
+
+    @Resource
+    private RedisUtil redisUtil;
 
     @Value("${file.upload.path:/tmp/upload}")
     private String uploadPath;
@@ -39,14 +47,25 @@ public class MerchantServiceImpl implements MerchantService {
     public boolean addMerchantType(MerchantType merchantType) {
         merchantType.setIsDeleted(0);
         merchantType.setCreateTime(LocalDateTime.now());
-        return merchantTypeMapper.insert(merchantType) > 0;
+        boolean result = merchantTypeMapper.insert(merchantType) > 0;
+        if (result) {
+            redisUtil.del(MERCHANT_TYPE_LIST_KEY);
+        }
+        return result;
     }
 
     @Override
     public List<MerchantType> getMerchantTypeList() {
+        List<MerchantType> cachedList = (List<MerchantType>) redisUtil.get(MERCHANT_TYPE_LIST_KEY);
+        if (cachedList != null) {
+            return cachedList;
+        }
+
         QueryWrapper<MerchantType> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("is_deleted", 0);
-        return merchantTypeMapper.selectList(queryWrapper);
+        List<MerchantType> list = merchantTypeMapper.selectList(queryWrapper);
+        redisUtil.set(MERCHANT_TYPE_LIST_KEY, list, CACHE_EXPIRE_TIME);
+        return list;
     }
 
     @Override
@@ -54,7 +73,11 @@ public class MerchantServiceImpl implements MerchantService {
         MerchantType merchantType = new MerchantType();
         merchantType.setId(id);
         merchantType.setIsDeleted(1);
-        return merchantTypeMapper.updateById(merchantType) > 0;
+        boolean result = merchantTypeMapper.updateById(merchantType) > 0;
+        if (result) {
+            redisUtil.del(MERCHANT_TYPE_LIST_KEY);
+        }
+        return result;
     }
 
     @Override
@@ -111,7 +134,11 @@ public class MerchantServiceImpl implements MerchantService {
     @Override
     public boolean updateMerchant(Merchant merchant) {
         merchant.setUpdateTime(LocalDateTime.now());
-        return merchantMapper.updateById(merchant) > 0;
+        boolean result = merchantMapper.updateById(merchant) > 0;
+        if (result) {
+            redisUtil.del(MERCHANT_INFO_KEY_PREFIX + merchant.getId());
+        }
+        return result;
     }
 
     @Override
@@ -120,7 +147,11 @@ public class MerchantServiceImpl implements MerchantService {
         merchant.setId(id);
         merchant.setIsDeleted(1);
         merchant.setUpdateTime(LocalDateTime.now());
-        return merchantMapper.updateById(merchant) > 0;
+        boolean result = merchantMapper.updateById(merchant) > 0;
+        if (result) {
+            redisUtil.del(MERCHANT_INFO_KEY_PREFIX + id);
+        }
+        return result;
     }
 
     @Override
@@ -174,9 +205,19 @@ public class MerchantServiceImpl implements MerchantService {
 
     @Override
     public Merchant getMerchantById(Long id) {
+        String cacheKey = MERCHANT_INFO_KEY_PREFIX + id;
+        Merchant cachedMerchant = (Merchant) redisUtil.get(cacheKey);
+        if (cachedMerchant != null) {
+            return cachedMerchant;
+        }
+
         QueryWrapper<Merchant> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("id", id);
         queryWrapper.eq("is_deleted", 0);
-        return merchantMapper.selectOne(queryWrapper);
+        Merchant merchant = merchantMapper.selectOne(queryWrapper);
+        if (merchant != null) {
+            redisUtil.set(cacheKey, merchant, CACHE_EXPIRE_TIME);
+        }
+        return merchant;
     }
 }

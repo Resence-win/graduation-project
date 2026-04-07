@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.*;
 import com.qms.campuscard.mapper.*;
 import com.qms.campuscard.service.CampusCardService;
+import com.qms.campuscard.util.RedisUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,11 @@ import java.util.Random;
 
 @Service
 public class CampusCardServiceImpl implements CampusCardService {
+
+    private static final String CARD_INFO_KEY_PREFIX = "card:info:";
+    private static final String CARD_INFO_NO_KEY_PREFIX = "card:info:no:";
+    private static final String ACCOUNT_BALANCE_KEY_PREFIX = "account:balance:";
+    private static final long CACHE_EXPIRE_TIME = 1800;
 
     @Resource
     private CampusCardMapper campusCardMapper;
@@ -37,6 +43,9 @@ public class CampusCardServiceImpl implements CampusCardService {
 
     @Resource
     private TeacherMapper teacherMapper;
+
+    @Resource
+    private RedisUtil redisUtil;
 
     private void recordCardChange(Long cardId, String operationType, String oldValue, String newValue) {
         CardChangeRecord record = new CardChangeRecord();
@@ -145,6 +154,12 @@ public class CampusCardServiceImpl implements CampusCardService {
 
     @Override
     public com.qms.campuscard.dto.CampusCardDTO getCardById(Long cardId) {
+        String cacheKey = CARD_INFO_KEY_PREFIX + cardId;
+        com.qms.campuscard.dto.CampusCardDTO cachedDto = (com.qms.campuscard.dto.CampusCardDTO) redisUtil.get(cacheKey);
+        if (cachedDto != null) {
+            return cachedDto;
+        }
+
         QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("id", cardId);
         queryWrapper.eq("is_deleted", 0);
@@ -188,6 +203,13 @@ public class CampusCardServiceImpl implements CampusCardService {
             }
         }
         
+        // 获取账户余额
+        Account account = getAccountByCardId(campusCard.getId());
+        if (account != null) {
+            dto.setBalance(account.getBalance());
+        }
+        
+        redisUtil.set(cacheKey, dto, CACHE_EXPIRE_TIME);
         return dto;
     }
 
@@ -255,6 +277,12 @@ public class CampusCardServiceImpl implements CampusCardService {
             }
         }
         
+        // 获取账户余额
+        Account account = getAccountByCardId(campusCard.getId());
+        if (account != null) {
+            dto.setBalance(account.getBalance());
+        }
+        
         return dto;
     }
 
@@ -265,22 +293,24 @@ public class CampusCardServiceImpl implements CampusCardService {
         if (campusCard == null || campusCard.getStatus() != 1) {
             return false;
         }
-        
+
         // 更新校园卡状态
-        campusCard.setStatus(2); // 2表示挂失状态
+        campusCard.setStatus(2);
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
-        
+
         if (success) {
             // 更新账户状态
             Account account = getAccountByCardId(cardId);
             if (account != null) {
-                account.setStatus(2); // 2表示挂失状态
+                account.setStatus(2);
                 account.setUpdateTime(LocalDateTime.now());
                 accountMapper.updateById(account);
             }
             // 记录挂失操作
             recordCardChange(cardId, "挂失", "正常", "挂失");
+            // 清除缓存
+            clearCardCache(cardId, campusCard.getCardNo());
         }
         return success;
     }
@@ -292,22 +322,24 @@ public class CampusCardServiceImpl implements CampusCardService {
         if (campusCard == null || campusCard.getStatus() != 2) {
             return false;
         }
-        
+
         // 更新校园卡状态
-        campusCard.setStatus(1); // 1表示正常状态
+        campusCard.setStatus(1);
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
-        
+
         if (success) {
             // 更新账户状态
             Account account = getAccountByCardId(cardId);
             if (account != null) {
-                account.setStatus(1); // 1表示正常状态
+                account.setStatus(1);
                 account.setUpdateTime(LocalDateTime.now());
                 accountMapper.updateById(account);
             }
             // 记录解挂操作
             recordCardChange(cardId, "解挂", "挂失", "正常");
+            // 清除缓存
+            clearCardCache(cardId, campusCard.getCardNo());
         }
         return success;
     }
@@ -319,22 +351,24 @@ public class CampusCardServiceImpl implements CampusCardService {
         if (campusCard == null) {
             return false;
         }
-        
+
         // 更新校园卡状态
-        campusCard.setStatus(0); // 0表示注销状态
+        campusCard.setStatus(0);
         campusCard.setUpdateTime(LocalDateTime.now());
         boolean success = campusCardMapper.updateById(campusCard) > 0;
-        
+
         if (success) {
             // 更新账户状态
             Account account = getAccountByCardId(cardId);
             if (account != null) {
-                account.setStatus(0); // 0表示注销状态
+                account.setStatus(0);
                 account.setUpdateTime(LocalDateTime.now());
                 accountMapper.updateById(account);
             }
             // 记录注销操作
             recordCardChange(cardId, "注销", null, "校园卡注销");
+            // 清除缓存
+            clearCardCache(cardId, campusCard.getCardNo());
         }
         return success;
     }
@@ -365,6 +399,12 @@ public class CampusCardServiceImpl implements CampusCardService {
 
     @Override
     public com.qms.campuscard.dto.CampusCardDTO getCardByCardNo(String cardNo) {
+        String cacheKey = CARD_INFO_NO_KEY_PREFIX + cardNo;
+        com.qms.campuscard.dto.CampusCardDTO cachedDto = (com.qms.campuscard.dto.CampusCardDTO) redisUtil.get(cacheKey);
+        if (cachedDto != null) {
+            return cachedDto;
+        }
+
         // 根据卡号查询校园卡
         QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("card_no", cardNo);
@@ -409,13 +449,28 @@ public class CampusCardServiceImpl implements CampusCardService {
             }
         }
         
+        // 获取账户余额
+        Account account = getAccountByCardId(campusCard.getId());
+        if (account != null) {
+            dto.setBalance(account.getBalance());
+        }
+        
+        redisUtil.set(cacheKey, dto, CACHE_EXPIRE_TIME);
         return dto;
     }
 
     @Override
     public BigDecimal getBalance(Long cardId) {
+        String cacheKey = ACCOUNT_BALANCE_KEY_PREFIX + cardId;
+        BigDecimal cachedBalance = (BigDecimal) redisUtil.get(cacheKey);
+        if (cachedBalance != null) {
+            return cachedBalance;
+        }
+
         Account account = getAccountByCardId(cardId);
-        return account != null ? account.getBalance() : BigDecimal.ZERO;
+        BigDecimal balance = account != null ? account.getBalance() : BigDecimal.ZERO;
+        redisUtil.set(cacheKey, balance, CACHE_EXPIRE_TIME);
+        return balance;
     }
 
     @Override
@@ -498,5 +553,11 @@ public class CampusCardServiceImpl implements CampusCardService {
         queryWrapper.eq("is_deleted", 0);
         queryWrapper.orderByDesc("create_time");
         return accountFlowMapper.selectPage(pageParam, queryWrapper);
+    }
+
+    private void clearCardCache(Long cardId, String cardNo) {
+        redisUtil.del(CARD_INFO_KEY_PREFIX + cardId);
+        redisUtil.del(CARD_INFO_NO_KEY_PREFIX + cardNo);
+        redisUtil.del(ACCOUNT_BALANCE_KEY_PREFIX + cardId);
     }
 }

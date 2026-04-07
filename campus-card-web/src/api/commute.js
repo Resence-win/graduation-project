@@ -26,6 +26,10 @@ export const deleteRoute = (id) => {
   return request.delete(`/commute/route/${id}`)
 }
 
+export const getAllRoutes = () => {
+  return request.get('/commute/route/all')
+}
+
 // 车辆管理
 export const getVehicleList = (params) => {
   return request.get('/commute/vehicle/list', { params })
@@ -45,6 +49,10 @@ export const updateVehicle = (data) => {
 
 export const deleteVehicle = (id) => {
   return request.delete(`/commute/vehicle/${id}`)
+}
+
+export const getAllVehicles = () => {
+  return request.get('/commute/vehicle/all')
 }
 
 // 站点管理
@@ -89,7 +97,13 @@ export const deleteSchedule = (id) => {
   return request.delete(`/commute/schedule/${id}`)
 }
 
+export const getAllSchedules = () => {
+  return request.get('/commute/schedule/all')
+}
 
+export const getSchedulesByRouteId = (routeId) => {
+  return request.get(`/commute/schedule/route/${routeId}`)
+}
 
 // 添加乘车记录
 export const addCommuteRecord = (data) => {

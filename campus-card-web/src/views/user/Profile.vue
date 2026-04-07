@@ -23,9 +23,6 @@
             <el-form-item label="联系电话">
               <el-input v-model="userInfo.phone" disabled />
             </el-form-item>
-            <el-form-item label="邮箱">
-              <el-input v-model="userInfo.email" disabled />
-            </el-form-item>
           </el-form>
         </el-tab-pane>
         

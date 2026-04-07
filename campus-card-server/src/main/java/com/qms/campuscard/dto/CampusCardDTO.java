@@ -2,6 +2,7 @@ package com.qms.campuscard.dto;
 
 import lombok.Data;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -16,6 +17,7 @@ public class CampusCardDTO implements Serializable {
     private String userNo; // 学号或教师编号
     private String userName; // 学生或教师姓名
     private Integer status;
+    private BigDecimal balance; // 账户余额
     private LocalDate issueDate;
     private LocalDate expireDate;
     private LocalDateTime createTime;

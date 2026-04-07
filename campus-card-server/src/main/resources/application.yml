@@ -7,16 +7,11 @@ spring:
 
   data:
     redis:
-      host: localhost
+      host: 127.0.0.1
       port: 6379
-      database: 0
-      timeout: 3000
-      lettuce:
-        pool:
-          max-active: 8
-          max-wait: -1
-          max-idle: 8
-          min-idle: 0
+      database: 8
+      timeout: 5000
+      password: 123456
 
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss

@@ -57,7 +57,13 @@ public class RedisUtil {
     }
 
     public Object get(String key) {
-        return key == null ? null : redisTemplate.opsForValue().get(key);
+        try {
+            return key == null ? null : redisTemplate.opsForValue().get(key);
+        } catch (Exception e) {
+            System.out.println("Redis get error: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public boolean set(String key, Object value) {
@@ -65,6 +71,7 @@ public class RedisUtil {
             redisTemplate.opsForValue().set(key, value);
             return true;
         } catch (Exception e) {
+            System.out.println("Redis set error: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -79,6 +86,7 @@ public class RedisUtil {
             }
             return true;
         } catch (Exception e) {
+            System.out.println("Redis set error: " + e.getMessage());
             e.printStackTrace();
             return false;
         }

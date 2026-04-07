@@ -62,11 +62,17 @@ public class RechargeController {
     @GetMapping("/list")
     public Result<IPage<com.qms.campuscard.dto.RechargeRecordDTO>> getRechargeRecords(
             @RequestParam(required = false) Long card_id,
+            @RequestParam(required = false) String card_no,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
-        IPage<com.qms.campuscard.dto.RechargeRecordDTO> records = rechargeService.getRechargeRecords(card_id, page, size);
+        IPage<com.qms.campuscard.dto.RechargeRecordDTO> records;
+        if (card_no != null && !card_no.isEmpty()) {
+            records = rechargeService.getRechargeRecordsByCardNo(card_no, page, size);
+        } else {
+            records = rechargeService.getRechargeRecords(card_id, page, size);
+        }
         // 记录日志
-        logUtil.recordLog(1L, "查询", "recharge_record", null, "查询充值记录，卡号：" + (card_id != null ? card_id : "全部"));
+        logUtil.recordLog(1L, "查询", "recharge_record", null, "查询充值记录，卡号：" + (card_id != null ? card_id : (card_no != null ? card_no : "全部")));
         return Result.success(records);
     }
 }

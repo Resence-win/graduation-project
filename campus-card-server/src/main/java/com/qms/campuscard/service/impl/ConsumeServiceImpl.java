@@ -15,6 +15,7 @@ import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.ConsumeRecordMapper;
 import com.qms.campuscard.mapper.MerchantMapper;
 import com.qms.campuscard.service.ConsumeService;
+import com.qms.campuscard.util.RedisUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,8 @@ import java.util.List;
 
 @Service
 public class ConsumeServiceImpl implements ConsumeService {
+
+    private static final String ACCOUNT_BALANCE_KEY_PREFIX = "account:balance:";
 
     @Resource
     private AccountMapper accountMapper;
@@ -41,6 +44,9 @@ public class ConsumeServiceImpl implements ConsumeService {
 
     @Resource
     private MerchantMapper merchantMapper;
+
+    @Resource
+    private RedisUtil redisUtil;
 
     @Override
     @Transactional
@@ -102,6 +108,9 @@ public class ConsumeServiceImpl implements ConsumeService {
         accountFlow.setCreateTime(LocalDateTime.now());
         accountFlowMapper.insert(accountFlow);
 
+        // 清除余额缓存
+        redisUtil.del(ACCOUNT_BALANCE_KEY_PREFIX + cardId);
+
         return true;
     }
 
@@ -136,21 +145,11 @@ public class ConsumeServiceImpl implements ConsumeService {
         consumeQuery.eq("is_deleted", 0);
         
         if (cardId != null && !cardId.isEmpty()) {
-            CampusCard campusCard = null;
-            try {
-                // 尝试将 cardId 转换为 Long，如果成功，则按 ID 查询
-                Long id = Long.parseLong(cardId);
-                QueryWrapper<CampusCard> cardQueryById = new QueryWrapper<>();
-                cardQueryById.eq("id", id);
-                cardQueryById.eq("is_deleted", 0);
-                campusCard = campusCardMapper.selectOne(cardQueryById);
-            } catch (NumberFormatException e) {
-                // 如果转换失败，则按卡号查询
-                QueryWrapper<CampusCard> cardQueryByNo = new QueryWrapper<>();
-                cardQueryByNo.eq("card_no", cardId);
-                cardQueryByNo.eq("is_deleted", 0);
-                campusCard = campusCardMapper.selectOne(cardQueryByNo);
-            }
+            // 直接按卡号查询校园卡
+            QueryWrapper<CampusCard> cardQueryByNo = new QueryWrapper<>();
+            cardQueryByNo.eq("card_no", cardId);
+            cardQueryByNo.eq("is_deleted", 0);
+            CampusCard campusCard = campusCardMapper.selectOne(cardQueryByNo);
             
             if (campusCard != null) {
                 // 查找账户

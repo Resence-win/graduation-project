@@ -6,15 +6,24 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.CommuteVehicle;
 import com.qms.campuscard.mapper.CommuteVehicleMapper;
 import com.qms.campuscard.service.CommuteVehicleService;
+import com.qms.campuscard.util.RedisUtil;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
+import java.util.List;
 
 @Service
 public class CommuteVehicleServiceImpl implements CommuteVehicleService {
 
+    private static final String VEHICLE_INFO_KEY_PREFIX = "commute:vehicle:";
+    private static final String VEHICLE_LIST_KEY = "commute:vehicle:list";
+    private static final long CACHE_EXPIRE_TIME = 3600;
+
     @Resource
     private CommuteVehicleMapper commuteVehicleMapper;
+
+    @Resource
+    private RedisUtil redisUtil;
 
     @Override
     public IPage<CommuteVehicle> getVehicleList(String plateNumber, Integer status, Integer page, Integer size) {
@@ -41,19 +50,53 @@ public class CommuteVehicleServiceImpl implements CommuteVehicleService {
     }
 
     @Override
+    public List<CommuteVehicle> getAllVehicles() {
+        List<CommuteVehicle> cachedList = (List<CommuteVehicle>) redisUtil.get(VEHICLE_LIST_KEY);
+        if (cachedList != null) {
+            return cachedList;
+        }
+
+        QueryWrapper<CommuteVehicle> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("is_deleted", 0);
+        queryWrapper.orderByDesc("create_time");
+        List<CommuteVehicle> list = commuteVehicleMapper.selectList(queryWrapper);
+        redisUtil.set(VEHICLE_LIST_KEY, list, CACHE_EXPIRE_TIME);
+        return list;
+    }
+
+    @Override
     public CommuteVehicle getVehicleById(Long id) {
-        return commuteVehicleMapper.selectById(id);
+        String cacheKey = VEHICLE_INFO_KEY_PREFIX + id;
+        CommuteVehicle cachedVehicle = (CommuteVehicle) redisUtil.get(cacheKey);
+        if (cachedVehicle != null) {
+            return cachedVehicle;
+        }
+
+        CommuteVehicle vehicle = commuteVehicleMapper.selectById(id);
+        if (vehicle != null) {
+            redisUtil.set(cacheKey, vehicle, CACHE_EXPIRE_TIME);
+        }
+        return vehicle;
     }
 
     @Override
     public boolean addVehicle(CommuteVehicle vehicle) {
         vehicle.setIsDeleted(0);
-        return commuteVehicleMapper.insert(vehicle) > 0;
+        boolean result = commuteVehicleMapper.insert(vehicle) > 0;
+        if (result) {
+            redisUtil.del(VEHICLE_LIST_KEY);
+        }
+        return result;
     }
 
     @Override
     public boolean updateVehicle(CommuteVehicle vehicle) {
-        return commuteVehicleMapper.updateById(vehicle) > 0;
+        boolean result = commuteVehicleMapper.updateById(vehicle) > 0;
+        if (result) {
+            redisUtil.del(VEHICLE_LIST_KEY);
+            redisUtil.del(VEHICLE_INFO_KEY_PREFIX + vehicle.getId());
+        }
+        return result;
     }
 
     @Override
@@ -61,6 +104,11 @@ public class CommuteVehicleServiceImpl implements CommuteVehicleService {
         CommuteVehicle vehicle = new CommuteVehicle();
         vehicle.setId(id);
         vehicle.setIsDeleted(1);
-        return commuteVehicleMapper.updateById(vehicle) > 0;
+        boolean result = commuteVehicleMapper.updateById(vehicle) > 0;
+        if (result) {
+            redisUtil.del(VEHICLE_LIST_KEY);
+            redisUtil.del(VEHICLE_INFO_KEY_PREFIX + id);
+        }
+        return result;
     }
 }
