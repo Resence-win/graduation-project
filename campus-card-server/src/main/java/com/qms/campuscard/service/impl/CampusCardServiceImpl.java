@@ -72,6 +72,12 @@ public class CampusCardServiceImpl implements CampusCardService {
     @Override
     @Transactional
     public CampusCard openCard(String userNo, String userType) {
+        return openCard(userNo, userType, null);
+    }
+
+    @Override
+    @Transactional
+    public CampusCard openCard(String userNo, String userType, String remark) {
         // 校验用户是否存在
         Long userId = null;
         try {
@@ -147,7 +153,8 @@ public class CampusCardServiceImpl implements CampusCardService {
         accountMapper.insert(account);
 
         // 记录开卡操作
-        recordCardChange(campusCard.getId(), "开卡", null, "用户ID: " + userId + ", 用户类型: " + userType);
+        String recordRemark = remark != null ? remark : "用户ID: " + userId + ", 用户类型: " + userType;
+        recordCardChange(campusCard.getId(), "开卡", null, recordRemark);
 
         return campusCard;
     }
@@ -289,6 +296,12 @@ public class CampusCardServiceImpl implements CampusCardService {
     @Override
     @Transactional
     public boolean lossCard(Long cardId) {
+        return lossCard(cardId, null);
+    }
+
+    @Override
+    @Transactional
+    public boolean lossCard(Long cardId, String remark) {
         CampusCard campusCard = campusCardMapper.selectById(cardId);
         if (campusCard == null || campusCard.getStatus() != 1) {
             return false;
@@ -308,7 +321,7 @@ public class CampusCardServiceImpl implements CampusCardService {
                 accountMapper.updateById(account);
             }
             // 记录挂失操作
-            recordCardChange(cardId, "挂失", "正常", "挂失");
+            recordCardChange(cardId, "挂失", "正常", remark != null ? remark : "挂失");
             // 清除缓存
             clearCardCache(cardId, campusCard.getCardNo());
         }
@@ -318,6 +331,12 @@ public class CampusCardServiceImpl implements CampusCardService {
     @Override
     @Transactional
     public boolean unlossCard(Long cardId) {
+        return unlossCard(cardId, null);
+    }
+
+    @Override
+    @Transactional
+    public boolean unlossCard(Long cardId, String remark) {
         CampusCard campusCard = campusCardMapper.selectById(cardId);
         if (campusCard == null || campusCard.getStatus() != 2) {
             return false;
@@ -337,7 +356,7 @@ public class CampusCardServiceImpl implements CampusCardService {
                 accountMapper.updateById(account);
             }
             // 记录解挂操作
-            recordCardChange(cardId, "解挂", "挂失", "正常");
+            recordCardChange(cardId, "解挂", "挂失", remark != null ? remark : "正常");
             // 清除缓存
             clearCardCache(cardId, campusCard.getCardNo());
         }
@@ -347,9 +366,23 @@ public class CampusCardServiceImpl implements CampusCardService {
     @Override
     @Transactional
     public boolean cancelCard(Long cardId) {
+        return cancelCard(cardId, null);
+    }
+
+    @Override
+    @Transactional
+    public boolean cancelCard(Long cardId, String remark) {
         CampusCard campusCard = campusCardMapper.selectById(cardId);
         if (campusCard == null) {
             return false;
+        }
+
+        // 检查是否在有效期内
+        if (campusCard.getExpireDate() != null && LocalDate.now().isBefore(campusCard.getExpireDate())) {
+            // 在有效期内，需要有特殊原因才能注销
+            if (remark == null || remark.isEmpty()) {
+                throw new RuntimeException("在有效期内注销校园卡需要填写注销原因");
+            }
         }
 
         // 更新校园卡状态
@@ -366,7 +399,7 @@ public class CampusCardServiceImpl implements CampusCardService {
                 accountMapper.updateById(account);
             }
             // 记录注销操作
-            recordCardChange(cardId, "注销", null, "校园卡注销");
+            recordCardChange(cardId, "注销", null, remark != null ? remark : "校园卡注销");
             // 清除缓存
             clearCardCache(cardId, campusCard.getCardNo());
         }

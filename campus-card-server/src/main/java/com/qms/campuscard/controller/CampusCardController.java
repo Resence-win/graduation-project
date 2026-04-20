@@ -33,10 +33,11 @@ public class CampusCardController {
         try {
             String userNo = request.getUserNo();
             String userType = request.getUserType();
+            String remark = request.getRemark();
             
-            CampusCard campusCard = campusCardService.openCard(userNo, userType);
+            CampusCard campusCard = campusCardService.openCard(userNo, userType, remark);
             // 记录日志
-            logUtil.recordLog(1L, "开卡", "campus_card", campusCard.getId(), "开卡成功：" + campusCard.getCardNo());
+            logUtil.recordLog(1L, "开卡", "campus_card", campusCard.getId(), "开卡成功：" + campusCard.getCardNo() + (remark != null ? "，原因：" + remark : ""));
             return Result.success("开卡成功", campusCard);
         } catch (Exception e) {
             // 记录日志
@@ -84,10 +85,10 @@ public class CampusCardController {
     @PostMapping("/card/loss")
     public Result<Boolean> lossCard(@RequestBody CardOperationRequest request) {
         CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
-        boolean success = campusCardService.lossCard(request.getCardId());
+        boolean success = campusCardService.lossCard(request.getCardId(), request.getRemark());
         if (success) {
             // 记录日志
-            logUtil.recordLog(1L, "修改", "campus_card", request.getCardId(), "挂失校园卡：" + (campusCard != null ? campusCard.getCardNo() : "未知"));
+            logUtil.recordLog(1L, "修改", "campus_card", request.getCardId(), "挂失校园卡：" + (campusCard != null ? campusCard.getCardNo() : "未知") + (request.getRemark() != null ? "，原因：" + request.getRemark() : ""));
             return Result.success("挂失成功", true);
         } else {
             return Result.error("挂失失败");
@@ -97,10 +98,10 @@ public class CampusCardController {
     @PostMapping("/card/unloss")
     public Result<Boolean> unlossCard(@RequestBody CardOperationRequest request) {
         CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
-        boolean success = campusCardService.unlossCard(request.getCardId());
+        boolean success = campusCardService.unlossCard(request.getCardId(), request.getRemark());
         if (success) {
             // 记录日志
-            logUtil.recordLog(1L, "修改", "campus_card", request.getCardId(), "解挂校园卡：" + (campusCard != null ? campusCard.getCardNo() : "未知"));
+            logUtil.recordLog(1L, "修改", "campus_card", request.getCardId(), "解挂校园卡：" + (campusCard != null ? campusCard.getCardNo() : "未知") + (request.getRemark() != null ? "，原因：" + request.getRemark() : ""));
             return Result.success("解挂成功", true);
         } else {
             return Result.error("解挂失败");
@@ -110,10 +111,10 @@ public class CampusCardController {
     @PostMapping("/card/cancel")
     public Result<Boolean> cancelCard(@RequestBody CardOperationRequest request) {
         CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
-        boolean success = campusCardService.cancelCard(request.getCardId());
+        boolean success = campusCardService.cancelCard(request.getCardId(), request.getRemark());
         if (success) {
             // 记录日志
-            logUtil.recordLog(1L, "修改", "campus_card", request.getCardId(), "注销校园卡：" + (campusCard != null ? campusCard.getCardNo() : "未知"));
+            logUtil.recordLog(1L, "修改", "campus_card", request.getCardId(), "注销校园卡：" + (campusCard != null ? campusCard.getCardNo() : "未知") + (request.getRemark() != null ? "，原因：" + request.getRemark() : ""));
             return Result.success("注销成功", true);
         } else {
             return Result.error("注销失败");

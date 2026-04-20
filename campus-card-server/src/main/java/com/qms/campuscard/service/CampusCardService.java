@@ -13,6 +13,7 @@ import java.util.List;
 public interface CampusCardService {
 
     CampusCard openCard(String userNo, String userType);
+    CampusCard openCard(String userNo, String userType, String remark);
 
     com.qms.campuscard.dto.CampusCardDTO getCardById(Long cardId);
 
@@ -21,10 +22,13 @@ public interface CampusCardService {
     com.baomidou.mybatisplus.core.metadata.IPage<com.qms.campuscard.dto.CampusCardDTO> getCardList(Page<com.qms.campuscard.entity.CampusCard> page, String cardNo, Integer status);
 
     boolean lossCard(Long cardId);
+    boolean lossCard(Long cardId, String remark);
 
     boolean unlossCard(Long cardId);
+    boolean unlossCard(Long cardId, String remark);
 
     boolean cancelCard(Long cardId);
+    boolean cancelCard(Long cardId, String remark);
 
     Account getAccountByCardId(Long cardId);
 

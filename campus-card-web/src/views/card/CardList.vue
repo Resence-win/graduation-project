@@ -104,10 +104,85 @@
             <el-option label="教师" value="teacher" />
           </el-select>
         </el-form-item>
+        <el-form-item label="开卡原因" prop="remark">
+          <el-select v-model="form.remark" placeholder="请选择开卡原因" style="width: 100%">
+            <el-option label="新生入校" value="新生入校" />
+            <el-option label="教师入职" value="教师入职" />
+            <el-option label="补办新卡" value="补办新卡" />
+            <el-option label="其他原因" value="其他原因" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+    
+    <el-dialog
+      v-model="operationDialogVisible"
+      :title="operationTitle"
+      width="500px"
+    >
+      <el-form :model="operationForm" ref="operationFormRef" label-width="100px">
+        <el-form-item label="操作原因" prop="remark">
+          <el-select 
+            v-if="operationType === 'loss' || operationType === 'unloss'"
+            v-model="operationForm.remark" 
+            placeholder="请选择操作原因" 
+            style="width: 100%"
+          >
+            <el-option 
+              v-if="operationType === 'loss'" 
+              label="卡片丢失" 
+              value="卡片丢失" 
+            />
+            <el-option 
+              v-if="operationType === 'loss'" 
+              label="卡片被盗" 
+              value="卡片被盗" 
+            />
+            <el-option 
+              v-if="operationType === 'loss'" 
+              label="其他原因" 
+              value="其他原因" 
+            />
+            <el-option 
+              v-if="operationType === 'unloss'" 
+              label="找回卡片" 
+              value="找回卡片" 
+            />
+            <el-option 
+              v-if="operationType === 'unloss'" 
+              label="其他原因" 
+              value="其他原因" 
+            />
+          </el-select>
+          <el-select 
+            v-if="operationType === 'cancel'"
+            v-model="operationForm.remark" 
+            placeholder="请选择注销原因" 
+            style="width: 100%"
+          >
+            <el-option label="学生毕业" value="学生毕业" />
+            <el-option label="教师离职" value="教师离职" />
+            <el-option label="合同到期" value="合同到期" />
+            <el-option label="学生转学" value="学生转学" />
+            <el-option label="学生辍学" value="学生辍学" />
+            <el-option label="其他特殊情况" value="其他特殊情况" />
+          </el-select>
+        </el-form-item>
+        <el-alert
+          v-if="operationType === 'cancel'"
+          title="注意：在有效期内注销校园卡需要填写注销原因"
+          type="warning"
+          :closable="false"
+          style="margin-bottom: 10px"
+        />
+      </el-form>
+      <template #footer>
+        <el-button @click="operationDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleOperationSubmit">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -119,7 +194,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCardList, openCard, getCardInfo, lossCard, unlossCard, cancelCard } from '@/api/card'
 
 const formRef = ref(null)
+const operationFormRef = ref(null)
 const dialogVisible = ref(false)
+const operationDialogVisible = ref(false)
 const tableData = ref([])
 
 const searchForm = reactive({
@@ -135,8 +212,17 @@ const pagination = reactive({
 
 const form = reactive({
   userNo: '',
-  userType: 'student'
+  userType: 'student',
+  remark: ''
 })
+
+const operationForm = reactive({
+  cardId: null,
+  remark: ''
+})
+
+const operationType = ref('')
+const operationTitle = ref('')
 
 const rules = {
   userNo: [
@@ -144,6 +230,9 @@ const rules = {
   ],
   userType: [
     { required: true, message: '请选择用户类型', trigger: 'change' }
+  ],
+  remark: [
+    { required: true, message: '请选择开卡原因', trigger: 'change' }
   ]
 }
 
@@ -225,62 +314,61 @@ const handleView = async (row) => {
 }
 
 const handleLoss = async (row) => {
-  try {
-    await ElMessageBox.confirm('确定要挂失该卡吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    
-    const res = await lossCard({ cardId: row.id })
-    if (res.code === 0) {
-      ElMessage.success('挂失成功')
-      loadData()
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('挂失失败:', error)
-    }
-  }
+  operationType.value = 'loss'
+  operationTitle.value = '挂失校园卡'
+  operationForm.cardId = row.id
+  operationForm.remark = ''
+  operationDialogVisible.value = true
 }
 
 const handleUnloss = async (row) => {
-  try {
-    await ElMessageBox.confirm('确定要解挂该卡吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    })
-    
-    const res = await unlossCard({ cardId: row.id })
-    if (res.code === 0) {
-      ElMessage.success('解挂成功')
-      loadData()
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('解挂失败:', error)
-    }
-  }
+  operationType.value = 'unloss'
+  operationTitle.value = '解挂校园卡'
+  operationForm.cardId = row.id
+  operationForm.remark = ''
+  operationDialogVisible.value = true
 }
 
 const handleCancel = async (row) => {
+  operationType.value = 'cancel'
+  operationTitle.value = '注销校园卡'
+  operationForm.cardId = row.id
+  operationForm.remark = ''
+  operationDialogVisible.value = true
+}
+
+const handleOperationSubmit = async () => {
   try {
-    await ElMessageBox.confirm('确定要注销该卡吗？注销后无法恢复！', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'error'
-    })
+    // 验证表单
+    if (!operationForm.remark) {
+      ElMessage.error('请选择操作原因')
+      return
+    }
     
-    const res = await cancelCard({ cardId: row.id })
-    if (res.code === 0) {
-      ElMessage.success('注销成功')
+    let res
+    if (operationType.value === 'loss') {
+      res = await lossCard({ cardId: operationForm.cardId, remark: operationForm.remark })
+      if (res.code === 0) {
+        ElMessage.success('挂失成功')
+      }
+    } else if (operationType.value === 'unloss') {
+      res = await unlossCard({ cardId: operationForm.cardId, remark: operationForm.remark })
+      if (res.code === 0) {
+        ElMessage.success('解挂成功')
+      }
+    } else if (operationType.value === 'cancel') {
+      res = await cancelCard({ cardId: operationForm.cardId, remark: operationForm.remark })
+      if (res.code === 0) {
+        ElMessage.success('注销成功')
+      }
+    }
+    
+    if (res && res.code === 0) {
+      operationDialogVisible.value = false
       loadData()
     }
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('注销失败:', error)
-    }
+    console.error('操作失败:', error)
   }
 }
 
@@ -291,7 +379,8 @@ const handleSubmit = async () => {
     // 转换参数名，与后端保持一致
     const requestData = {
       user_no: form.userNo,
-      user_type: form.userType
+      user_type: form.userType,
+      remark: form.remark
     }
     
     console.log('开卡请求参数:', requestData)

@@ -8,4 +8,5 @@ public class CardOperationRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long cardId;
+    private String remark; // 操作原因
 }

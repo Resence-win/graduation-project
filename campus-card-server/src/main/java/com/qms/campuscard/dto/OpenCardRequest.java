@@ -9,6 +9,7 @@ public class OpenCardRequest implements Serializable {
 
     private String user_no; // 学号或教师编号
     private String user_type;
+    private String remark; // 开卡原因
     
     // 添加getter方法，与前端保持一致
     public String getUserNo() {
@@ -17,5 +18,9 @@ public class OpenCardRequest implements Serializable {
     
     public String getUserType() {
         return user_type;
+    }
+    
+    public String getRemark() {
+        return remark;
     }
 }
