@@ -15,6 +15,7 @@ import jakarta.annotation.Resource;
 import java.security.MessageDigest;
 import java.math.BigInteger;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class StudentServiceImpl implements StudentService {
@@ -125,5 +126,54 @@ public class StudentServiceImpl implements StudentService {
         student.setIsDeleted(1);
         student.setUpdateTime(LocalDateTime.now());
         return studentMapper.updateById(student) > 0;
+    }
+
+    @Override
+    public boolean batchImportStudents(List<Student> students) {
+        if (students == null || students.isEmpty()) {
+            return false;
+        }
+
+        for (Student student : students) {
+            // 检查学号是否已存在
+            Student existingStudent = getStudentByStudentNo(student.getStudentNo());
+            if (existingStudent != null) {
+                // 学号已存在，跳过或更新
+                continue;
+            }
+
+            // 设置默认值
+            student.setStatus(1);
+            student.setIsDeleted(0);
+            student.setCreateTime(LocalDateTime.now());
+
+            // 插入学生信息
+            if (studentMapper.insert(student) <= 0) {
+                return false;
+            }
+
+            // 创建对应的管理员用户（默认密码为123456）
+            AdminUser adminUser = new AdminUser();
+            adminUser.setUsername(student.getStudentNo());
+            adminUser.setPassword(getMD5("123456"));
+            adminUser.setRole("student");
+            adminUser.setStatus(1);
+            adminUser.setIsDeleted(0);
+            adminUser.setCreateTime(LocalDateTime.now());
+
+            if (adminUserMapper.insert(adminUser) <= 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    @Override
+    public List<Student> getAllStudents() {
+        QueryWrapper<Student> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("is_deleted", 0);
+        queryWrapper.orderByDesc("create_time");
+        return studentMapper.selectList(queryWrapper);
     }
 }

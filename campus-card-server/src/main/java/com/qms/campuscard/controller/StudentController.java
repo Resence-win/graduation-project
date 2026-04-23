@@ -7,6 +7,10 @@ import com.qms.campuscard.common.Result;
 import com.qms.campuscard.dto.StudentRequest;
 import com.qms.campuscard.entity.Student;
 import com.qms.campuscard.service.StudentService;
+import com.qms.campuscard.util.ExcelUtil;
+
+import java.util.List;
+
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
@@ -95,6 +99,51 @@ public class StudentController {
             return Result.success("删除成功", true);
         } else {
             return Result.error("删除失败");
+        }
+    }
+
+    /**
+     * 导出所有学生信息
+     */
+    @GetMapping("/export")
+    public void exportStudents(jakarta.servlet.http.HttpServletResponse response) {
+        try {
+            List<Student> students = studentService.getAllStudents();
+            ExcelUtil.exportStudents(response, students);
+            // 记录日志
+            logUtil.recordLog(1L, "导出", "student", null, "导出学生信息，共" + students.size() + "条");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 批量导入学生信息
+     */
+    @PostMapping("/import")
+    public Result<Boolean> importStudents(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            List<Student> students = ExcelUtil.importStudentsSimple(file.getInputStream());
+            boolean success = studentService.batchImportStudents(students);
+            if (success) {
+                logUtil.recordLog(1L, "导入", "student", null, "导入学生信息，共" + students.size() + "条");
+                return Result.success("导入成功", true);
+            } else {
+                return Result.error("导入失败");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error("导入失败：" + e.getMessage());
+        }
+    }
+
+    @GetMapping("/template/download")
+    public void downloadImportTemplate(jakarta.servlet.http.HttpServletResponse response) {
+        try {
+            ExcelUtil.downloadImportTemplate(response);
+            logUtil.recordLog(1L, "下载", "student", null, "下载学生导入模板");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

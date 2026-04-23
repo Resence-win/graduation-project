@@ -17,11 +17,23 @@
             <el-form-item label="学号/工号">
               <el-input v-model="userInfo.username" disabled />
             </el-form-item>
-            <el-form-item label="性别">
+            <el-form-item label="性别" v-if="userInfo.role === 'student'">
+              <el-select v-model="userInfo.gender" placeholder="请选择性别">
+                <el-option label="男" value="男" />
+                <el-option label="女" value="女" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="性别" v-else>
               <el-input v-model="userInfo.gender" disabled />
             </el-form-item>
-            <el-form-item label="联系电话">
+            <el-form-item label="联系电话" v-if="userInfo.role === 'student'">
+              <el-input v-model="userInfo.phone" placeholder="请输入联系电话" />
+            </el-form-item>
+            <el-form-item label="联系电话" v-else>
               <el-input v-model="userInfo.phone" disabled />
+            </el-form-item>
+            <el-form-item v-if="userInfo.role === 'student'">
+              <el-button type="primary" @click="handleUpdateProfile">保存修改</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -317,6 +329,66 @@
           </div>
         </el-tab-pane>
         
+        <el-tab-pane label="充值管理" name="recharge">
+          <div class="recharge-section">
+            <el-card shadow="hover" class="recharge-card">
+              <template #header>
+                <div class="card-header">
+                  <span>充值操作</span>
+                  <el-button type="primary" @click="showRechargeDialog = true">立即充值</el-button>
+                </div>
+              </template>
+              <div class="recharge-info">
+                <div class="balance-info">
+                  <el-tag type="info" size="large">当前余额: {{ cardInfo.balance }} 元</el-tag>
+                </div>
+              </div>
+            </el-card>
+            
+            <el-card shadow="hover" style="margin-top: 20px">
+              <template #header>
+                <div class="card-header">
+                  <span>充值记录</span>
+                </div>
+              </template>
+              <el-form :inline="true" :model="rechargeForm" class="mb-4">
+                <el-form-item label="开始日期">
+                  <el-date-picker v-model="rechargeForm.startDate" type="date" placeholder="选择开始日期" />
+                </el-form-item>
+                <el-form-item label="结束日期">
+                  <el-date-picker v-model="rechargeForm.endDate" type="date" placeholder="选择结束日期" />
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="loadRechargeData">查询</el-button>
+                  <el-button @click="resetRechargeForm">重置</el-button>
+                </el-form-item>
+              </el-form>
+              
+              <el-table :data="rechargeList" border style="width: 100%">
+                <el-table-column prop="id" label="ID" width="80" />
+                <el-table-column prop="amount" label="充值金额" width="120">
+                  <template #default="{ row }">
+                    <span style="color: #67c23a">+{{ row.amount }} 元</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="rechargeType" label="充值方式" width="120" />
+                <el-table-column prop="createTime" label="充值时间" width="180" />
+              </el-table>
+              
+              <el-pagination
+                v-model:current-page="rechargePagination.page"
+                v-model:page-size="rechargePagination.size"
+                :page-sizes="[10, 20, 50, 100]"
+                :total="rechargePagination.total"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleRechargeSizeChange"
+                @current-change="handleRechargeCurrentChange"
+                style="margin-top: 20px; justify-content: flex-end"
+              />
+            </el-card>
+          </div>
+        </el-tab-pane>
+        
         <!-- 二维码开门对话框 -->
         <el-dialog
           v-model="showQRCodeDialog"
@@ -403,6 +475,70 @@
           </span>
         </template>
       </el-dialog>
+      
+      <!-- 充值对话框 -->
+      <el-dialog
+        v-model="showRechargeDialog"
+        title="校园卡充值"
+        width="400px"
+      >
+        <el-form :model="rechargeFormDialog" label-width="80px">
+          <el-form-item label="卡号" required>
+            <el-input v-model="rechargeFormDialog.cardNo" disabled />
+          </el-form-item>
+          <el-form-item label="充值金额" required>
+            <el-input-number v-model="rechargeFormDialog.amount" :min="1" :max="1000" :step="10" :precision="2" />
+          </el-form-item>
+          <el-form-item label="充值方式" required>
+            <el-select v-model="rechargeFormDialog.rechargeType">
+              <el-option label="微信" value="微信" />
+              <el-option label="支付宝" value="支付宝" />
+              <el-option label="现金" value="现金" v-if="userInfo.role === 'admin'" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="showRechargeDialog = false">取消</el-button>
+            <el-button type="primary" @click="handleRecharge">确认充值</el-button>
+          </span>
+        </template>
+      </el-dialog>
+      
+      <!-- 模拟扫码支付对话框 -->
+      <el-dialog
+        v-model="showScanDialog"
+        title="扫码支付"
+        width="400px"
+      >
+        <div class="scan-container">
+          <div class="scan-qr-code" v-if="scanQRCodeUrl">
+            <img :src="scanQRCodeUrl" alt="支付二维码" />
+            <p class="scan-tip">请使用{{ rechargeFormDialog.rechargeType }}扫描二维码</p>
+            <div class="scan-status" :class="scanStatus">
+              <el-icon :size="16">
+                <component :is="scanStatus === 'waiting' ? 'Loading' : scanStatus === 'scanning' ? 'Loading' : scanStatus === 'success' ? 'Check' : 'Warning'" />
+              </el-icon>
+              <span>
+                {{ scanStatus === 'waiting' ? '等待扫码...' : 
+                   scanStatus === 'scanning' ? '扫码中...' : 
+                   scanStatus === 'success' ? '支付成功！' : 
+                   scanStatus === 'failed' ? '支付超时' : '' }}
+              </span>
+            </div>
+          </div>
+          <div class="scan-loading" v-else>
+            <el-icon class="is-loading"><loading /></el-icon>
+            <span>正在生成支付二维码...</span>
+          </div>
+        </div>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="cancelScan">取消支付</el-button>
+            <el-button type="primary" v-if="scanStatus === 'failed'" @click="generateScanQRCode">重新生成</el-button>
+          </span>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -412,13 +548,14 @@ import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElDialog, ElForm, ElFormItem, ElSelect, ElOption, ElInput, ElDatePicker, ElButton, ElIcon } from 'element-plus'
 import { Loading, ArrowRightBold, ArrowLeftBold, Check, Warning, Position } from '@element-plus/icons-vue'
-import { getStudentByNo } from '@/api/student'
+import { getStudentByNo, updateStudent } from '@/api/student'
 import { getTeacherByNo } from '@/api/teacher'
 import { getCardInfo, getCardByUserNo } from '@/api/card'
 import { getConsumeList } from '@/api/consume'
 import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, returnBook } from '@/api/book'
 import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/access'
 import { getAttendanceList, createAttendance, getActiveLocations } from '@/api/attendance'
+import { getRechargeList, recharge, rechargeByCardNo } from '@/api/recharge'
 
 const router = useRouter()
 
@@ -438,6 +575,29 @@ const cardInfo = reactive({
   balance: '0.00',
   createTime: ''
 })
+
+// 充值相关
+const showRechargeDialog = ref(false)
+const showScanDialog = ref(false)
+const rechargeForm = reactive({
+  startDate: '',
+  endDate: ''
+})
+const rechargeList = ref([])
+const rechargePagination = reactive({
+  page: 1,
+  size: 10,
+  total: 0
+})
+const rechargeFormDialog = reactive({
+  cardNo: '',
+  amount: 100,
+  rechargeType: '微信'
+})
+// 模拟扫码支付相关
+const scanQRCodeUrl = ref('')
+const scanStatus = ref('waiting') // waiting, success, failed
+const scanPolling = ref(null)
 
 const consumeForm = reactive({
   startDate: '',
@@ -582,6 +742,7 @@ const loadCardInfo = async () => {
           res.data.createTime = new Date(res.data.createTime).toLocaleString()
         }
         Object.assign(cardInfo, res.data)
+        console.log('校园卡信息:', cardInfo)
       }
     }
   } catch (error) {
@@ -1190,6 +1351,202 @@ const logout = () => {
   router.push('/login')
 }
 
+const handleUpdateProfile = async () => {
+  try {
+    // 验证手机号格式
+    if (userInfo.phone && !/^1[3-9]\d{9}$/.test(userInfo.phone)) {
+      ElMessage.error('请输入正确的手机号')
+      return
+    }
+    
+    const res = await updateStudent(userInfo)
+    if (res.code === 0) {
+      ElMessage.success('个人信息更新成功')
+      // 重新加载用户信息
+      await loadUserInfo()
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (error) {
+    console.error('更新个人信息失败:', error)
+    ElMessage.error('更新失败，请稍后重试')
+  }
+}
+
+// 充值相关方法
+const loadRechargeData = async () => {
+  try {
+    if (cardInfo.id) {
+      const res = await getRechargeList({
+        card_id: cardInfo.id,
+        page: rechargePagination.page,
+        size: rechargePagination.size
+      })
+      if (res.code === 0) {
+        rechargeList.value = res.data.records || []
+        rechargePagination.total = res.data.total || 0
+      }
+    }
+  } catch (error) {
+    console.error('加载充值记录失败:', error)
+  }
+}
+
+const handleRecharge = async () => {
+  try {
+    if (!cardInfo.id || !rechargeFormDialog.amount || !rechargeFormDialog.rechargeType) {
+      ElMessage.error('请填写完整的充值信息')
+      return
+    }
+
+    // 显示扫码支付对话框
+    showRechargeDialog.value = false
+    showScanDialog.value = true
+    
+    // 生成支付二维码
+    generateScanQRCode()
+  } catch (error) {
+    console.error('充值操作失败:', error)
+    ElMessage.error('充值操作失败，请稍后重试')
+  }
+}
+
+const generateScanQRCode = () => {
+  scanStatus.value = 'waiting'
+  
+  // 生成二维码（包含必要的参数）
+  const scanCode = Math.random().toString(36).substring(2, 15)
+  const cardId = cardInfo.id
+  const amount = rechargeFormDialog.amount
+  const rechargeType = rechargeFormDialog.rechargeType
+  
+  // 构建二维码内容，包含必要的参数
+  const scanData = JSON.stringify({
+    card_id: cardId,
+    amount: amount,
+    recharge_type: rechargeType,
+    scan_code: scanCode
+  })
+  
+  scanQRCodeUrl.value = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(scanData)}`
+  
+  // 5秒后提示扫码中
+  setTimeout(() => {
+    if (showScanDialog.value && scanStatus.value === 'waiting') {
+      scanStatus.value = 'scanning'
+    }
+  }, 5000)
+  
+  // 模拟二维码有效期为15秒
+  setTimeout(() => {
+    if (showScanDialog.value && (scanStatus.value === 'waiting' || scanStatus.value === 'scanning')) {
+      scanQRCodeUrl.value = ''
+      scanStatus.value = 'failed'
+      ElMessage.warning('支付超时，请重新尝试')
+    }
+  }, 15000)
+  
+  // 开始轮询，检查支付状态
+  startScanPolling(scanCode)
+}
+
+const startScanPolling = (scanCode) => {
+  // 清除之前的轮询
+  if (scanPolling.value) {
+    clearTimeout(scanPolling.value)
+  }
+  
+  // 10秒后模拟支付成功
+  scanPolling.value = setTimeout(async () => {
+    if (showScanDialog.value) {
+      // 模拟支付成功
+      scanStatus.value = 'success'
+      
+      // 调用后端充值接口
+      try {
+        console.log('充值参数:', {
+          card_id: cardInfo.id,
+          amount: rechargeFormDialog.amount,
+          recharge_type: rechargeFormDialog.rechargeType
+        })
+        
+        const response = await recharge({
+          card_id: cardInfo.id,
+          amount: rechargeFormDialog.amount,
+          recharge_type: rechargeFormDialog.rechargeType
+        })
+        
+        console.log('充值响应:', response)
+        
+        if (response.code === 0) {
+          // 显示成功消息
+          ElMessage.success(`充值成功！已为您的校园卡充值 ${rechargeFormDialog.amount} 元`)
+          
+          // 重新加载校园卡信息和充值记录
+          await loadCardInfo()
+          loadRechargeData()
+        } else {
+          ElMessage.error('充值失败：' + response.message)
+        }
+      } catch (error) {
+        console.error('调用充值接口失败:', error)
+        ElMessage.error('充值失败，请稍后重试')
+      }
+      
+      // 2秒后关闭对话框
+      setTimeout(() => {
+        showScanDialog.value = false
+        scanQRCodeUrl.value = ''
+      }, 2000)
+    }
+  }, 10000)
+}
+
+const cancelScan = () => {
+  if (scanPolling.value) {
+    clearTimeout(scanPolling.value)
+    scanPolling.value = null
+  }
+  showScanDialog.value = false
+  scanQRCodeUrl.value = ''
+  scanStatus.value = 'waiting'
+}
+
+const resetRechargeForm = () => {
+  rechargeForm.startDate = ''
+  rechargeForm.endDate = ''
+  loadRechargeData()
+}
+
+const handleRechargeSizeChange = (val) => {
+  rechargePagination.size = val
+  loadRechargeData()
+}
+
+const handleRechargeCurrentChange = (val) => {
+  rechargePagination.page = val
+  loadRechargeData()
+}
+
+// 监听充值对话框的显示
+watch(() => showRechargeDialog.value, (newVal) => {
+  if (newVal) {
+    rechargeFormDialog.cardNo = cardInfo.cardNo
+    rechargeFormDialog.amount = 100
+    rechargeFormDialog.rechargeType = '微信'
+  }
+})
+
+// 监听扫码支付对话框的显示
+watch(() => showScanDialog.value, (newVal) => {
+  if (!newVal && scanPolling.value) {
+    clearInterval(scanPolling.value)
+    scanPolling.value = null
+    scanQRCodeUrl.value = ''
+    scanStatus.value = 'waiting'
+  }
+})
+
 // 监听二维码开门对话框的显示
 watch(() => showQRCodeDialog.value, (newVal) => {
   if (newVal) {
@@ -1205,6 +1562,7 @@ onMounted(async () => {
   loadConsumeData()
   loadAccessData()
   loadAttendanceData()
+  loadRechargeData()
   loadActiveLocations()
   getCurrentLocation()
   if (userInfo.role === 'student') {
@@ -1383,6 +1741,97 @@ onMounted(async () => {
 .location-info span,
 .location-error span,
 .location-loading span {
+  margin-left: 8px;
+}
+
+/* 充值相关样式 */
+.recharge-section {
+  padding: 20px 0;
+}
+
+.recharge-card {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.recharge-info {
+  text-align: center;
+  padding: 30px 0;
+}
+
+.balance-info {
+  margin-bottom: 20px;
+}
+
+/* 扫码支付相关样式 */
+.scan-container {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.scan-qr-code {
+  margin-top: 20px;
+}
+
+.scan-qr-code img {
+  width: 200px;
+  height: 200px;
+}
+
+.scan-tip {
+  margin-top: 10px;
+  color: #606266;
+}
+
+.scan-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 40px;
+}
+
+.scan-loading .el-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+/* 扫码状态样式 */
+.scan-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  padding: 5px 15px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.scan-status.waiting {
+  background-color: #f5f7fa;
+  color: #409eff;
+  border: 1px solid #d9ecff;
+}
+
+.scan-status.scanning {
+  background-color: #f5f7fa;
+  color: #409eff;
+  border: 1px solid #d9ecff;
+}
+
+.scan-status.success {
+  background-color: #f0f9ff;
+  color: #67c23a;
+  border: 1px solid #e1f5d6;
+}
+
+.scan-status.failed {
+  background-color: #fff0f0;
+  color: #f56c6c;
+  border: 1px solid #fbc4c4;
+}
+
+.scan-status span {
   margin-left: 8px;
 }
 </style>

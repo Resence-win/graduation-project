@@ -23,3 +23,21 @@ export const updateStudent = (data) => {
 export const deleteStudent = (id) => {
   return request.delete(`/student/${id}`)
 }
+
+export const exportStudents = () => {
+  return request.get('/student/export', { responseType: 'blob' })
+}
+
+export const importStudents = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/student/import', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+export const downloadImportTemplate = () => {
+  return request.get('/student/template/download', { responseType: 'blob' })
+}

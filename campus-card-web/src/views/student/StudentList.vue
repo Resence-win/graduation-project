@@ -4,7 +4,11 @@
       <template #header>
         <div class="card-header">
           <span>学生管理</span>
-          <el-button type="primary" @click="handleAdd">新增学生</el-button>
+          <div>
+            <el-button type="primary" @click="handleAdd">新增学生</el-button>
+            <el-button type="success" @click="handleExport">导出学生</el-button>
+            <el-button type="warning" @click="dialogImportVisible = true">导入学生</el-button>
+          </div>
         </div>
       </template>
       
@@ -96,18 +100,64 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+    
+    <!-- 导入学生对话框 -->
+    <el-dialog
+      v-model="dialogImportVisible"
+      title="导入学生"
+      width="500px"
+    >
+      <div class="mb-4">
+        <el-button type="info" @click="handleDownloadTemplate">
+          <el-icon><download /></el-icon>
+          下载导入模板
+        </el-button>
+        <div class="text-xs text-gray-500 mt-2">
+          模板包含必要字段：学号、姓名、学院、专业、班级
+        </div>
+      </div>
+      <el-form label-width="80px">
+        <el-form-item label="导入文件">
+          <el-upload
+            class="upload-demo"
+            ref="uploadRef"
+            action=""
+            :auto-upload="false"
+            :on-change="handleFileChange"
+            :file-list="fileList"
+            :limit="1"
+            accept=".xlsx, .xls"
+          >
+            <el-button type="primary">选择文件</el-button>
+            <template #tip>
+              <div class="el-upload__tip">
+                请上传Excel文件，使用模板文件格式
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogImportVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleImport">导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getStudentList, addStudent, updateStudent, deleteStudent } from '@/api/student'
+import { getStudentList, addStudent, updateStudent, deleteStudent, exportStudents, importStudents, downloadImportTemplate } from '@/api/student'
 
 const formRef = ref(null)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增学生')
 const tableData = ref([])
+const dialogImportVisible = ref(false)
+const uploadRef = ref(null)
+const fileList = ref([])
+let selectedFile = null
 
 const searchForm = reactive({
   studentNo: '',
@@ -260,6 +310,70 @@ const handleSizeChange = (val) => {
 const handleCurrentChange = (val) => {
   pagination.page = val
   loadData()
+}
+
+const handleFileChange = (file) => {
+  selectedFile = file.raw
+  fileList.value = [file]
+}
+
+const handleExport = async () => {
+  try {
+    const res = await exportStudents()
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `学生信息_${new Date().toISOString().slice(0, 10)}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
+}
+
+const handleImport = async () => {
+  if (!selectedFile) {
+    ElMessage.warning('请选择文件')
+    return
+  }
+  
+  try {
+    const res = await importStudents(selectedFile)
+    if (res.code === 0) {
+      ElMessage.success('导入成功')
+      dialogImportVisible.value = false
+      fileList.value = []
+      selectedFile = null
+      loadData()
+    }
+  } catch (error) {
+    console.error('导入失败:', error)
+    ElMessage.error('导入失败')
+  }
+}
+
+const handleDownloadTemplate = async () => {
+  try {
+    const res = await downloadImportTemplate()
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `学生导入模板.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('模板下载成功')
+  } catch (error) {
+    console.error('下载模板失败:', error)
+    ElMessage.error('下载模板失败')
+  }
 }
 
 onMounted(() => {
