@@ -22,10 +22,18 @@
       
       <el-table :data="tableData" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="operatorId" label="操作人ID" width="100" />
+        <el-table-column prop="operatorName" label="操作人" width="150">
+          <template #default="{ row }">
+            {{ row.operatorName || row.operatorId }}
+          </template>
+        </el-table-column>
         <el-table-column prop="operationType" label="操作类型" width="150" />
         <el-table-column prop="targetTable" label="操作表" width="120" />
-        <el-table-column prop="targetId" label="目标ID" width="100" />
+        <el-table-column prop="targetName" label="目标" width="150">
+          <template #default="{ row }">
+            {{ row.targetName || row.targetId }}
+          </template>
+        </el-table-column>
         <el-table-column prop="content" label="操作内容" width="300" show-overflow-tooltip />
         <el-table-column prop="createTime" label="操作时间" width="180" />
       </el-table>

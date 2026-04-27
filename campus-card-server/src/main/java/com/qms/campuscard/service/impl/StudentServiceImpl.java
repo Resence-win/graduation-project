@@ -152,17 +152,25 @@ public class StudentServiceImpl implements StudentService {
                 return false;
             }
 
-            // 创建对应的管理员用户（默认密码为123456）
-            AdminUser adminUser = new AdminUser();
-            adminUser.setUsername(student.getStudentNo());
-            adminUser.setPassword(getMD5("123456"));
-            adminUser.setRole("student");
-            adminUser.setStatus(1);
-            adminUser.setIsDeleted(0);
-            adminUser.setCreateTime(LocalDateTime.now());
+            // 检查管理员用户是否已存在
+            QueryWrapper<AdminUser> adminUserQueryWrapper = new QueryWrapper<>();
+            adminUserQueryWrapper.eq("username", student.getStudentNo());
+            adminUserQueryWrapper.eq("is_deleted", 0);
+            AdminUser existingAdminUser = adminUserMapper.selectOne(adminUserQueryWrapper);
+            
+            // 如果管理员用户不存在，则创建
+            if (existingAdminUser == null) {
+                AdminUser adminUser = new AdminUser();
+                adminUser.setUsername(student.getStudentNo());
+                adminUser.setPassword(getMD5("123456"));
+                adminUser.setRole("student");
+                adminUser.setStatus(1);
+                adminUser.setIsDeleted(0);
+                adminUser.setCreateTime(LocalDateTime.now());
 
-            if (adminUserMapper.insert(adminUser) <= 0) {
-                return false;
+                if (adminUserMapper.insert(adminUser) <= 0) {
+                    return false;
+                }
             }
         }
 

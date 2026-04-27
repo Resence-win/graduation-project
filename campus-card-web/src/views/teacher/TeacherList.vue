@@ -22,7 +22,11 @@
       </el-form>
       
       <el-table :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="80">
+          <template #default="{ $index }">
+            {{ $index + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="teacherNo" label="教师编号" width="120" />
         <el-table-column prop="name" label="姓名" width="100" />
         <el-table-column prop="gender" label="性别" width="80" />

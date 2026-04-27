@@ -32,7 +32,11 @@
       </el-form>
       
       <el-table :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="80">
+          <template #default="{ $index }">
+            {{ $index + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="merchantName" label="商户名称" width="150" />
         <el-table-column prop="typeName" label="类型" width="120" />
         <el-table-column prop="location" label="位置" width="200" />

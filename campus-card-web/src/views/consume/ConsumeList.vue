@@ -29,7 +29,11 @@
       </el-form>
       
       <el-table :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="80">
+          <template #default="{ $index }">
+            {{ $index + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="cardNo" label="账户卡号" width="180" />
         <el-table-column prop="merchantName" label="商户名称" width="180" />
         <el-table-column prop="amount" label="消费金额" width="120">

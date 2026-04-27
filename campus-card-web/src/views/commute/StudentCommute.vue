@@ -355,12 +355,8 @@ const loadScheduleList = async (routeId) => {
   try {
     const res = await getScheduleList({ routeId, page: 1, size: 100 })
     if (res.code === 0) {
-      // 将新的时刻表数据添加到列表中，而不是覆盖
-      const newSchedules = res.data.records || []
-      scheduleList.value = [...scheduleList.value, ...newSchedules]
-      // 去重，避免重复数据
-      const uniqueSchedules = [...new Map(scheduleList.value.map(item => [item.id, item])).values()]
-      scheduleList.value = uniqueSchedules
+      // 只存储当前线路的时刻表数据
+      scheduleList.value = res.data.records || []
     }
   } catch (error) {
     console.error('加载时刻表失败:', error)

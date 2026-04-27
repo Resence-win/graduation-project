@@ -36,4 +36,8 @@ public class AttendanceRecord {
     // 非数据库字段，用于存储打卡位置名称
     @TableField(exist = false)
     private String locationName;
+    
+    // 非数据库字段，用于存储校园卡卡号
+    @TableField(exist = false)
+    private String cardNo;
 }

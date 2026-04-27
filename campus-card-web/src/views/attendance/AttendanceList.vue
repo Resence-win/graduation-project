@@ -33,7 +33,7 @@
       
       <el-table :data="tableData" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="cardId" label="卡ID" width="100" />
+        <el-table-column prop="cardNo" label="卡号" width="150" />
         <el-table-column prop="status" label="考勤状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">

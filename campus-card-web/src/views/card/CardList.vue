@@ -26,7 +26,11 @@
       </el-form>
       
       <el-table :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="80">
+          <template #default="{ $index }">
+            {{ $index + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="cardNo" label="卡号" width="150" />
         <el-table-column prop="userNo" label="学号/教师编号" width="150" />
         <el-table-column prop="userName" label="姓名" width="120" />

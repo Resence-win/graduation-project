@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.AttendanceLocation;
 import com.qms.campuscard.entity.AttendanceRecord;
+import com.qms.campuscard.entity.CampusCard;
 import com.qms.campuscard.mapper.AttendanceRecordMapper;
+import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.service.AttendanceLocationService;
 import com.qms.campuscard.service.AttendanceRecordService;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,9 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
     
     @Resource
     private AttendanceLocationService attendanceLocationService;
+    
+    @Resource
+    private CampusCardMapper campusCardMapper;
 
     @Override
     public IPage<AttendanceRecord> getAttendanceRecords(Long cardId, String status, Integer page, Integer size) {
@@ -47,12 +52,21 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         queryWrapper.orderByDesc("record_time");
         IPage<AttendanceRecord> result = attendanceRecordMapper.selectPage(pageParam, queryWrapper);
         
-        // 填充打卡位置名称
+        // 填充打卡位置名称和校园卡卡号
         for (AttendanceRecord record : result.getRecords()) {
             if (record.getLocationId() != null) {
                 AttendanceLocation location = attendanceLocationService.getLocationById(record.getLocationId());
                 if (location != null) {
                     record.setLocationName(location.getLocationName());
+                }
+            }
+            if (record.getCardId() != null) {
+                QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+                cardQuery.eq("id", record.getCardId());
+                cardQuery.eq("is_deleted", 0);
+                CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+                if (campusCard != null) {
+                    record.setCardNo(campusCard.getCardNo());
                 }
             }
         }
@@ -129,12 +143,21 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         queryWrapper.orderByDesc("record_time");
         IPage<AttendanceRecord> result = attendanceRecordMapper.selectPage(pageParam, queryWrapper);
         
-        // 填充打卡位置名称
+        // 填充打卡位置名称和校园卡卡号
         for (AttendanceRecord record : result.getRecords()) {
             if (record.getLocationId() != null) {
                 AttendanceLocation location = attendanceLocationService.getLocationById(record.getLocationId());
                 if (location != null) {
                     record.setLocationName(location.getLocationName());
+                }
+            }
+            if (record.getCardId() != null) {
+                QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+                cardQuery.eq("id", record.getCardId());
+                cardQuery.eq("is_deleted", 0);
+                CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+                if (campusCard != null) {
+                    record.setCardNo(campusCard.getCardNo());
                 }
             }
         }
@@ -166,12 +189,21 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         queryWrapper.orderByDesc("record_time");
         IPage<AttendanceRecord> result = attendanceRecordMapper.selectPage(pageParam, queryWrapper);
         
-        // 填充打卡位置名称
+        // 填充打卡位置名称和校园卡卡号
         for (AttendanceRecord record : result.getRecords()) {
             if (record.getLocationId() != null) {
                 AttendanceLocation location = attendanceLocationService.getLocationById(record.getLocationId());
                 if (location != null) {
                     record.setLocationName(location.getLocationName());
+                }
+            }
+            if (record.getCardId() != null) {
+                QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+                cardQuery.eq("id", record.getCardId());
+                cardQuery.eq("is_deleted", 0);
+                CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+                if (campusCard != null) {
+                    record.setCardNo(campusCard.getCardNo());
                 }
             }
         }
