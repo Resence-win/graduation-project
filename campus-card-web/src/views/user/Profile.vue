@@ -24,15 +24,18 @@
               </el-select>
             </el-form-item>
             <el-form-item label="性别" v-else>
-              <el-input v-model="userInfo.gender" disabled />
+              <el-select v-model="userInfo.gender" placeholder="请选择性别">
+                <el-option label="男" value="男" />
+                <el-option label="女" value="女" />
+              </el-select>
             </el-form-item>
             <el-form-item label="联系电话" v-if="userInfo.role === 'student'">
               <el-input v-model="userInfo.phone" placeholder="请输入联系电话" />
             </el-form-item>
             <el-form-item label="联系电话" v-else>
-              <el-input v-model="userInfo.phone" disabled />
+              <el-input v-model="userInfo.phone" placeholder="请输入联系电话" />
             </el-form-item>
-            <el-form-item v-if="userInfo.role === 'student'">
+            <el-form-item v-if="userInfo.role === 'student' || userInfo.role === 'teacher'">
               <el-button type="primary" @click="handleUpdateProfile">保存修改</el-button>
             </el-form-item>
           </el-form>
@@ -390,6 +393,30 @@
           </div>
         </el-tab-pane>
         
+        <el-tab-pane label="修改密码" name="password">
+          <el-card shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <span>修改密码</span>
+              </div>
+            </template>
+            <el-form :model="passwordForm" label-width="120px" style="max-width: 500px">
+              <el-form-item label="旧密码" required>
+                <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入旧密码" />
+              </el-form-item>
+              <el-form-item label="新密码" required>
+                <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码" />
+              </el-form-item>
+              <el-form-item label="确认新密码" required>
+                <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请确认新密码" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleChangePassword">确认修改</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </el-tab-pane>
+        
         <!-- 二维码开门对话框 -->
         <el-dialog
           v-model="showQRCodeDialog"
@@ -550,13 +577,14 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElDialog, ElForm, ElFormItem, ElSelect, ElOption, ElInput, ElDatePicker, ElButton, ElIcon } from 'element-plus'
 import { Loading, ArrowRightBold, ArrowLeftBold, Check, Warning, Position } from '@element-plus/icons-vue'
 import { getStudentByNo, updateStudent } from '@/api/student'
-import { getTeacherByNo } from '@/api/teacher'
+import { getTeacherByNo, updateTeacher } from '@/api/teacher'
 import { getCardInfo, getCardByUserNo } from '@/api/card'
 import { getConsumeList } from '@/api/consume'
 import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, returnBook } from '@/api/book'
 import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/access'
 import { getAttendanceList, createAttendance, getActiveLocations } from '@/api/attendance'
 import { getRechargeList, recharge, rechargeByCardNo } from '@/api/recharge'
+import { changePassword } from '@/api/admin'
 
 const router = useRouter()
 
@@ -575,6 +603,13 @@ const cardInfo = reactive({
   status: 1,
   balance: '0.00',
   createTime: ''
+})
+
+// 密码修改表单
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
 })
 
 // 充值相关
@@ -1352,6 +1387,47 @@ const logout = () => {
   router.push('/login')
 }
 
+// 修改密码
+const handleChangePassword = async () => {
+  try {
+    if (!passwordForm.oldPassword) {
+      ElMessage.error('请输入旧密码')
+      return
+    }
+    if (!passwordForm.newPassword) {
+      ElMessage.error('请输入新密码')
+      return
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      ElMessage.error('两次输入的新密码不一致')
+      return
+    }
+    
+    const res = await changePassword({
+      username: userInfo.username,
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword
+    })
+    
+    if (res.code === 0) {
+      ElMessage.success('密码修改成功，请重新登录')
+      // 清空密码表单
+      passwordForm.oldPassword = ''
+      passwordForm.newPassword = ''
+      passwordForm.confirmPassword = ''
+      // 退出登录
+      setTimeout(() => {
+        logout()
+      }, 1000)
+    } else {
+      ElMessage.error(res.msg || '密码修改失败')
+    }
+  } catch (error) {
+    console.error('修改密码失败:', error)
+    ElMessage.error('修改密码失败，请稍后重试')
+  }
+}
+
 const handleUpdateProfile = async () => {
   try {
     // 验证手机号格式
@@ -1360,8 +1436,14 @@ const handleUpdateProfile = async () => {
       return
     }
     
-    const res = await updateStudent(userInfo)
-    if (res.code === 0) {
+    let res
+    if (userInfo.role === 'student') {
+      res = await updateStudent(userInfo)
+    } else if (userInfo.role === 'teacher') {
+      res = await updateTeacher(userInfo)
+    }
+    
+    if (res && res.code === 0) {
       ElMessage.success('个人信息更新成功')
       // 重新加载用户信息
       await loadUserInfo()

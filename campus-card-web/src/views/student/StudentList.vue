@@ -45,9 +45,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button size="small" @click="handleResetPassword(row)">重置密码</el-button>
             <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -153,6 +154,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getStudentList, addStudent, updateStudent, deleteStudent, exportStudents, importStudents, downloadImportTemplate } from '@/api/student'
+import { resetPassword } from '@/api/admin'
 
 const formRef = ref(null)
 const dialogVisible = ref(false)
@@ -279,6 +281,29 @@ const handleDelete = async (row) => {
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
+    }
+  }
+}
+
+const handleResetPassword = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定要将该学生的密码重置为123456吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    const res = await resetPassword({
+      username: row.studentNo,
+      newPassword: '123456'
+    })
+    if (res.code === 0) {
+      ElMessage.success('密码重置成功')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('重置密码失败:', error)
+      ElMessage.error('重置密码失败')
     }
   }
 }

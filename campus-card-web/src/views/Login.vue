@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <h2>校园一卡通管理系统</h2>
-          <p>{{ loginForm.role === 'admin' ? '管理员登录' : loginForm.role === 'student' ? '学生登录' : '教师登录' }}</p>
+          <p>用户登录</p>
         </div>
       </template>
       
@@ -14,14 +14,6 @@
         :rules="loginRules"
         label-width="80px"
       >
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="loginForm.role" placeholder="请选择角色" class="w-full">
-            <el-option label="管理员" value="admin" />
-            <el-option label="学生" value="student" />
-            <el-option label="教师" value="teacher" />
-          </el-select>
-        </el-form-item>
-        
         <el-form-item label="用户名" prop="username">
           <el-input
             v-model="loginForm.username"
@@ -57,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login } from '@/api/auth'
@@ -67,15 +59,11 @@ const loginFormRef = ref(null)
 const loading = ref(false)
 
 const loginForm = reactive({
-  role: 'admin',
   username: 'admin',
   password: '123456'
 })
 
 const loginRules = {
-  role: [
-    { required: true, message: '请选择角色', trigger: 'change' }
-  ],
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' }
   ],
@@ -85,40 +73,37 @@ const loginRules = {
   ]
 }
 
-// 监听角色变化，更新默认用户名和密码
-watch(
-  () => loginForm.role,
-  (newRole) => {
-    if (newRole === 'admin') {
-      loginForm.username = 'admin'
-      loginForm.password = '123456'
-    } else if (newRole === 'student') {
-      loginForm.username = '2021001'
-      loginForm.password = '123456'
-    } else if (newRole === 'teacher') {
-      loginForm.username = 'T001'
-      loginForm.password = '123456'
-    }
-  }
-)
-
 const handleLogin = async () => {
   try {
     await loginFormRef.value.validate()
     loading.value = true
     
-    // 将角色信息传递给后端进行验证
+    // 登录时不传递角色，由后端根据账号判断角色
     const res = await login({ 
       username: loginForm.username, 
-      password: loginForm.password,
-      role: loginForm.role
+      password: loginForm.password
     })
     console.log('登录响应:', res)
     
     if (res.code === 0) {
+      // 获取后端返回的角色
+      const backendRole = res.data.user?.role
+      
+      // 转换后端角色格式（后端可能返回SUPER_ADMIN/admin/student/teacher）
+      let userRole = backendRole
+      if (backendRole === 'SUPER_ADMIN') {
+        userRole = 'admin'
+      } else if (backendRole === 'admin') {
+        userRole = 'admin'
+      } else if (backendRole === 'student') {
+        userRole = 'student'
+      } else if (backendRole === 'teacher') {
+        userRole = 'teacher'
+      }
+      
       const userInfo = {
         ...res.data.user,
-        role: loginForm.role,
+        role: userRole,
         cardId: res.data.cardId,
         cardNo: res.data.cardNo
       }
@@ -127,21 +112,24 @@ const handleLogin = async () => {
       localStorage.setItem('user', JSON.stringify(userInfo))
       ElMessage.success('登录成功')
       
-      // 根据角色跳转到不同页面
-      console.log('角色:', loginForm.role)
+      // 根据后端返回的角色跳转到不同页面
+      console.log('角色:', userRole)
       try {
-        if (loginForm.role === 'admin') {
+        if (userRole === 'admin') {
           console.log('准备跳转到首页')
           router.push('/')
           console.log('跳转完成')
-        } else if (loginForm.role === 'teacher') {
-          console.log('准备跳转到打卡位置管理')
-          router.push('/attendance/location')
-          console.log('跳转完成')
-        } else {
+        } else if (userRole === 'teacher') {
           console.log('准备跳转到个人中心')
           router.push('/profile')
           console.log('跳转完成')
+        } else if (userRole === 'student') {
+          console.log('准备跳转到个人中心')
+          router.push('/profile')
+          console.log('跳转完成')
+        } else {
+          console.log('未知角色，默认跳转到个人中心')
+          router.push('/profile')
         }
       } catch (error) {
         console.error('跳转失败:', error)

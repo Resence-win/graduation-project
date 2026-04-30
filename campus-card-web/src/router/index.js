@@ -157,7 +157,7 @@ router.beforeEach((to, from, next) => {
     if (user && user.role === 'admin') {
       next('/')
     } else if (user && user.role === 'teacher') {
-      next('/attendance/location')
+      next('/profile')
     } else {
       next('/profile')
     }

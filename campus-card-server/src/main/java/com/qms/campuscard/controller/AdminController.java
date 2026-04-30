@@ -12,10 +12,13 @@ import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.StudentMapper;
 import com.qms.campuscard.mapper.TeacherMapper;
 import com.qms.campuscard.service.AdminUserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
+@Slf4j
 public class AdminController {
 
     private final AdminUserService adminUserService;
@@ -32,46 +35,33 @@ public class AdminController {
 
     @PostMapping("/login")
     public Result<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
+        log.info("登录请求: {}", loginRequest.getUsername());
         AdminUser adminUser = adminUserService.login(loginRequest.getUsername(), loginRequest.getPassword());
         if (adminUser == null) {
+            log.warn("登录失败，用户名或密码错误: {}", loginRequest.getUsername());
             return Result.error("用户名或密码错误");
         }
         
-        // 验证用户选择的角色是否与数据库中的角色一致
-        String selectedRole = loginRequest.getRole();
+        // 获取数据库中的角色信息
         String actualRole = adminUser.getRole();
-        
-        if (selectedRole == null || selectedRole.isEmpty()) {
-            return Result.error("请选择登录角色");
-        }
-        
-        // 角色映射：前端传递的角色值与数据库存储的角色值可能不同
-        // 前端：admin, student, teacher
-        // 数据库：SUPER_ADMIN, student, teacher
-        boolean roleMatch = false;
-        if ("admin".equals(selectedRole)) {
-            // 管理员角色可以是 SUPER_ADMIN 或 admin
-            roleMatch = "SUPER_ADMIN".equals(actualRole) || "admin".equals(actualRole);
-        } else if ("student".equals(selectedRole)) {
-            roleMatch = "student".equals(actualRole);
-        } else if ("teacher".equals(selectedRole)) {
-            roleMatch = "teacher".equals(actualRole);
-        }
-        
-        if (!roleMatch) {
-            return Result.error("角色不匹配，请使用正确的角色登录");
-        }
+        log.info("用户实际角色: {}", actualRole);
         
         // 构建登录响应
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setUser(adminUser);
         
+        // 直接使用数据库中的角色进行判断
+        String normalizedRole = actualRole;
+        if ("SUPER_ADMIN".equals(actualRole)) {
+            normalizedRole = "admin";
+        }
+        
         // 如果是学生或教师，查询对应的校园卡信息
-        if ("student".equals(selectedRole) || "teacher".equals(selectedRole)) {
+        if ("student".equals(normalizedRole) || "teacher".equals(normalizedRole)) {
             Long userId = null;
-            String userType = selectedRole;
+            String userType = normalizedRole;
             
-            if ("student".equals(selectedRole)) {
+            if ("student".equals(normalizedRole)) {
                 // 根据学号查询学生信息
                 QueryWrapper<Student> studentWrapper = new QueryWrapper<>();
                 studentWrapper.eq("student_no", adminUser.getUsername());
@@ -80,7 +70,7 @@ public class AdminController {
                 if (student != null) {
                     userId = student.getId();
                 }
-            } else if ("teacher".equals(selectedRole)) {
+            } else if ("teacher".equals(normalizedRole)) {
                 // 根据教师号查询教师信息
                 QueryWrapper<Teacher> teacherWrapper = new QueryWrapper<>();
                 teacherWrapper.eq("teacher_no", adminUser.getUsername());
@@ -105,6 +95,44 @@ public class AdminController {
             }
         }
         
+        log.info("登录成功: {}, 角色: {}", loginRequest.getUsername(), normalizedRole);
         return Result.success("登录成功", loginResponse);
+    }
+    
+    @PostMapping("/changePassword")
+    public Result changePassword(@RequestBody Map<String, String> params) {
+        log.info("修改密码请求，参数: {}", params.keySet());
+        String username = params.get("username");
+        String oldPassword = params.get("oldPassword");
+        String newPassword = params.get("newPassword");
+        
+        log.info("修改密码 - 用户名: {}", username);
+        
+        boolean result = adminUserService.changePassword(username, oldPassword, newPassword);
+        if (result) {
+            log.info("密码修改成功: {}", username);
+            return Result.success("密码修改成功");
+        } else {
+            log.warn("密码修改失败: {}", username);
+            return Result.error("密码修改失败，旧密码错误");
+        }
+    }
+    
+    @PostMapping("/resetPassword")
+    public Result resetPassword(@RequestBody Map<String, String> params) {
+        log.info("重置密码请求，参数: {}", params.keySet());
+        String username = params.get("username");
+        String newPassword = params.get("newPassword");
+        
+        log.info("重置密码 - 用户名: {}", username);
+        
+        boolean result = adminUserService.resetPassword(username, newPassword);
+        if (result) {
+            log.info("密码重置成功: {}", username);
+            return Result.success("密码重置成功");
+        } else {
+            log.warn("密码重置失败: {}", username);
+            return Result.error("密码重置失败，用户不存在");
+        }
     }
 }
