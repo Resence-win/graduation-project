@@ -5,9 +5,10 @@ import com.qms.campuscard.entity.AttendanceRecord;
 
 public interface AttendanceRecordService {
 
-    IPage<AttendanceRecord> getAttendanceRecords(Long cardId, String status, Integer page, Integer size);
+    IPage<AttendanceRecord> getAttendanceRecords(Long cardId, String status, String startDate, String endDate, Integer page, Integer size);
     
-    AttendanceRecord createAttendance(Long cardId, Long locationId, String actualLocation, Double actualLatitude, Double actualLongitude, String deviceInfo);
+    AttendanceRecord createAttendance(Long cardId, Long locationId, String actualLocation, Double actualLatitude, Double actualLongitude, String deviceInfo,
+                                      String attendanceType, String internshipCompany, String internshipLog, String internshipLogDate);
     
     IPage<AttendanceRecord> getAttendanceStatistics(String startDate, String endDate, Integer page, Integer size);
     

@@ -45,6 +45,9 @@ public class StudentServiceImpl implements StudentService {
         student.setMajor(studentRequest.getMajor());
         student.setClassName(studentRequest.getClassName());
         student.setPhone(studentRequest.getPhone());
+        student.setAttendanceMode(normalizeAttendanceMode(studentRequest.getAttendanceMode()));
+        student.setAttendanceStatus(normalizeAttendanceStatus(studentRequest.getAttendanceStatus()));
+        student.setInternshipCompany(studentRequest.getInternshipCompany());
         student.setStatus(1);
         student.setIsDeleted(0);
         student.setCreateTime(LocalDateTime.now());
@@ -115,8 +118,24 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public boolean updateStudent(Student student) {
+        student.setAttendanceMode(normalizeAttendanceMode(student.getAttendanceMode()));
+        student.setAttendanceStatus(normalizeAttendanceStatus(student.getAttendanceStatus()));
         student.setUpdateTime(LocalDateTime.now());
         return studentMapper.updateById(student) > 0;
+    }
+
+    private String normalizeAttendanceMode(String attendanceMode) {
+        if (attendanceMode == null || attendanceMode.trim().isEmpty()) {
+            return "CAMPUS";
+        }
+        return attendanceMode.trim().toUpperCase();
+    }
+
+    private String normalizeAttendanceStatus(String attendanceStatus) {
+        if (attendanceStatus == null || attendanceStatus.trim().isEmpty()) {
+            return "ON_CAMPUS";
+        }
+        return attendanceStatus.trim().toUpperCase();
     }
 
     @Override

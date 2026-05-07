@@ -19,8 +19,8 @@
         <el-table-column prop="endTime" label="结束时间" width="180" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '有效' : '无效' }}
+            <el-tag :type="getLocationStatus(row).type">
+              {{ getLocationStatus(row).text }}
             </el-tag>
           </template>
         </el-table-column>
@@ -71,7 +71,12 @@
           <el-date-picker v-model="locationForm.startTime" type="datetime" placeholder="选择开始时间" />
         </el-form-item>
         <el-form-item label="结束时间" prop="endTime">
-          <el-date-picker v-model="locationForm.endTime" type="datetime" placeholder="选择结束时间" />
+          <el-date-picker
+            v-model="locationForm.endTime"
+            type="datetime"
+            placeholder="选择结束时间"
+            :disabled-date="disabledEndDate"
+          />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-select v-model="locationForm.status" placeholder="请选择状态">
@@ -108,6 +113,11 @@
             <el-tag :type="getStatusType(row.status)">
               {{ row.status }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="考勤类型" width="120">
+          <template #default="{ row }">
+            {{ getAttendanceTypeLabel(row.attendanceType) }}
           </template>
         </el-table-column>
         <el-table-column prop="actualLocation" label="实际打卡地点" />
@@ -200,6 +210,45 @@ const getStatusType = (status) => {
     '缺勤': 'danger'
   }
   return map[status] || 'info'
+}
+
+const getAttendanceTypeLabel = (type) => {
+  const map = {
+    CAMPUS_LOCATION: '校内位置',
+    OFF_CAMPUS_LOCATION: '校外位置',
+    INTERNSHIP_LOG: '实习日志',
+    LEAVE: '请假'
+  }
+  return map[type] || '校内位置'
+}
+
+const getLocationStatus = (row) => {
+  if (Number(row.status) !== 1) {
+    return { type: 'danger', text: '已停用' }
+  }
+  const now = Date.now()
+  const startTime = row.startTime ? new Date(row.startTime).getTime() : null
+  const endTime = row.endTime ? new Date(row.endTime).getTime() : null
+  if (!startTime || !endTime) {
+    return { type: 'info', text: '未配置' }
+  }
+  if (now < startTime) {
+    return { type: 'warning', text: '未开始' }
+  }
+  if (now > endTime) {
+    return { type: 'info', text: '已过期' }
+  }
+  return { type: 'success', text: '有效中' }
+}
+
+const disabledEndDate = (time) => {
+  if (!locationForm.startTime) {
+    return false
+  }
+  const startDate = new Date(locationForm.startTime)
+  const endOfPreviousDay = new Date(startDate)
+  endOfPreviousDay.setHours(0, 0, 0, 0)
+  return time.getTime() < endOfPreviousDay.getTime()
 }
 
 // 获取当前位置
@@ -321,6 +370,26 @@ const handleEditLocation = (row) => {
 }
 
 const handleSaveLocation = async () => {
+  if (!locationForm.locationName) {
+    ElMessage.error('请输入位置名称')
+    return
+  }
+  if (!locationForm.latitude || !locationForm.longitude) {
+    ElMessage.error('请输入经纬度')
+    return
+  }
+  if (!locationForm.radius || Number(locationForm.radius) <= 0) {
+    ElMessage.error('打卡半径必须大于0')
+    return
+  }
+  if (!locationForm.startTime || !locationForm.endTime) {
+    ElMessage.error('请选择开始时间和结束时间')
+    return
+  }
+  if (new Date(locationForm.endTime).getTime() <= new Date(locationForm.startTime).getTime()) {
+    ElMessage.error('结束时间必须晚于开始时间')
+    return
+  }
   try {
     let res
     if (currentLocationId.value) {

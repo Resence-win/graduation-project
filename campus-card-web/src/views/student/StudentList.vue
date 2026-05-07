@@ -38,6 +38,20 @@
         <el-table-column prop="major" label="专业" width="150" />
         <el-table-column prop="className" label="班级" width="100" />
         <el-table-column prop="phone" label="手机号" width="120" />
+        <el-table-column label="考勤模式" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.attendanceMode === 'INTERNSHIP' ? 'warning' : 'success'">
+              {{ row.attendanceMode === 'INTERNSHIP' ? '校外实习' : '在校考勤' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="考勤状态" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.attendanceStatus === 'LEAVE' ? 'warning' : row.attendanceStatus === 'INTERNSHIP' ? 'primary' : 'success'">
+              {{ getAttendanceStatusLabel(row.attendanceStatus) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
@@ -95,6 +109,22 @@
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="form.phone" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-form-item label="考勤模式" prop="attendanceMode">
+          <el-select v-model="form.attendanceMode" placeholder="请选择考勤模式">
+            <el-option label="在校考勤" value="CAMPUS" />
+            <el-option label="校外实习" value="INTERNSHIP" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="考勤状态" prop="attendanceStatus">
+          <el-select v-model="form.attendanceStatus" placeholder="请选择考勤状态">
+            <el-option label="在校" value="ON_CAMPUS" />
+            <el-option label="外出实习" value="INTERNSHIP" />
+            <el-option label="已请假" value="LEAVE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="实习单位" prop="internshipCompany" v-if="form.attendanceMode === 'INTERNSHIP'">
+          <el-input v-model="form.internshipCompany" placeholder="请输入实习单位" />
         </el-form-item>
         <el-form-item label="密码" prop="password" v-if="!form.id">
           <el-input v-model="form.password" type="password" placeholder="请输入密码" />
@@ -185,6 +215,9 @@ const form = reactive({
   major: '',
   className: '',
   phone: '',
+  attendanceMode: 'CAMPUS',
+  attendanceStatus: 'ON_CAMPUS',
+  internshipCompany: '',
   password: ''
 })
 
@@ -255,8 +288,20 @@ const handleAdd = () => {
     major: '',
     className: '',
     phone: '',
+    attendanceMode: 'CAMPUS',
+    attendanceStatus: 'ON_CAMPUS',
+    internshipCompany: '',
     password: ''
   })
+}
+
+const getAttendanceStatusLabel = (status) => {
+  const map = {
+    ON_CAMPUS: '在校',
+    INTERNSHIP: '外出实习',
+    LEAVE: '已请假'
+  }
+  return map[status] || '在校'
 }
 
 const handleEdit = (row) => {

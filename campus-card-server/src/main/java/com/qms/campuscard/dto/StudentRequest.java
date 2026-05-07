@@ -11,5 +11,8 @@ public class StudentRequest {
     private String major;
     private String className;
     private String phone;
+    private String attendanceMode;
+    private String attendanceStatus;
+    private String internshipCompany;
     private String password; // 新增密码字段
 }

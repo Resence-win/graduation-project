@@ -60,6 +60,7 @@
             </template>
             <el-menu-item index="/attendance">考勤记录</el-menu-item>
             <el-menu-item index="/attendance/location">打卡位置管理</el-menu-item>
+            <el-menu-item index="/attendance/application">申报审批</el-menu-item>
           </el-sub-menu>
           <el-menu-item index="/commute">通勤车管理</el-menu-item>
           <el-menu-item index="/log">系统日志</el-menu-item>
@@ -81,6 +82,10 @@
         <el-menu-item index="/attendance/location">
           <el-icon><Location /></el-icon>
           <span>打卡位置管理</span>
+        </el-menu-item>
+        <el-menu-item index="/attendance/application">
+          <el-icon><Ticket /></el-icon>
+          <span>申报审批</span>
         </el-menu-item>
       </template>
     </template>

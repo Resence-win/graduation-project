@@ -242,10 +242,114 @@
             <el-card shadow="hover" class="attendance-card">
               <template #header>
                 <div class="card-header">
-                  <span>打卡区域</span>
+                  <span>考勤申报</span>
+                </div>
+              </template>
+              <el-tabs v-model="applicationTab">
+                <el-tab-pane label="外出实习申报" name="internship">
+                  <el-form :model="internshipApplicationForm" label-width="90px">
+                    <el-form-item label="实习单位">
+                      <el-input v-model="internshipApplicationForm.company" placeholder="请输入实习单位" />
+                    </el-form-item>
+                    <el-form-item label="开始日期">
+                      <el-date-picker v-model="internshipApplicationForm.startDate" type="date" placeholder="选择开始日期" style="width: 100%" />
+                    </el-form-item>
+                    <el-form-item label="说明">
+                      <el-input v-model="internshipApplicationForm.reason" type="textarea" :rows="3" placeholder="请填写实习岗位、地点或指导老师要求" />
+                    </el-form-item>
+                    <el-form-item>
+                      <el-button
+                        type="primary"
+                        @click="handleSubmitInternshipApplication"
+                        :disabled="hasActiveInternshipApplication || submittingInternshipApplication"
+                        :loading="submittingInternshipApplication"
+                      >
+                        提交实习申报
+                      </el-button>
+                    </el-form-item>
+                  </el-form>
+                </el-tab-pane>
+                <el-tab-pane label="请假申请" name="leave">
+                  <el-form :model="leaveApplicationForm" label-width="90px">
+                    <el-form-item label="请假日期">
+                      <el-date-picker
+                        v-model="leaveApplicationForm.dateRange"
+                        type="daterange"
+                        range-separator="至"
+                        start-placeholder="开始日期"
+                        end-placeholder="结束日期"
+                        style="width: 100%"
+                      />
+                    </el-form-item>
+                    <el-form-item label="请假原因">
+                      <el-input v-model="leaveApplicationForm.reason" type="textarea" :rows="3" placeholder="请输入请假原因" />
+                    </el-form-item>
+                    <el-form-item v-if="hasOverlappingLeaveApplication">
+                      <el-alert
+                        title="已有待审核或已通过的请假申请，请勿重复提交。"
+                        type="warning"
+                        show-icon
+                        :closable="false"
+                      />
+                    </el-form-item>
+                    <el-form-item>
+                      <el-button
+                        type="primary"
+                        @click="handleSubmitLeaveApplication"
+                        :disabled="hasOverlappingLeaveApplication || submittingLeaveApplication"
+                        :loading="submittingLeaveApplication"
+                      >
+                        提交请假申请
+                      </el-button>
+                    </el-form-item>
+                  </el-form>
+                </el-tab-pane>
+              </el-tabs>
+              <el-table :data="attendanceApplications" border style="width: 100%; margin-top: 16px" v-if="attendanceApplications.length">
+                <el-table-column label="申报类型" width="110">
+                  <template #default="{ row }">
+                    {{ row.applicationType === 'LEAVE' ? '请假' : '外出实习' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="日期" width="210">
+                  <template #default="{ row }">
+                    {{ row.startDate || '-' }}<span v-if="row.endDate"> 至 {{ row.endDate }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="reason" label="说明" show-overflow-tooltip />
+                <el-table-column label="状态" width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="getApplicationStatusType(row.status)">
+                      {{ getApplicationStatusText(row.status) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-card>
+
+            <el-card shadow="hover" class="attendance-card">
+              <template #header>
+                <div class="card-header">
+                  <span>{{ isInternshipAttendance ? '实习打卡' : '打卡区域' }}</span>
                 </div>
               </template>
               <div class="checkin-container">
+                <el-alert
+                  v-if="isLeaveAttendance"
+                  title="当前处于请假范围，打卡类型将记录为请假；可选择老师下发的考勤位置，实际地点按当前位置保存。"
+                  type="warning"
+                  show-icon
+                  :closable="false"
+                  style="margin-bottom: 20px; text-align: left"
+                />
+                <el-alert
+                  v-else-if="isInternshipAttendance"
+                  title="当前为校外实习考勤，打卡类型将记录为校外位置，也可提交实习日志。"
+                  type="info"
+                  show-icon
+                  :closable="false"
+                  style="margin-bottom: 20px; text-align: left"
+                />
                 <div class="location-info" v-if="currentLocation">
                   <el-icon><Position /></el-icon>
                   <span>当前位置: {{ currentLocation }}</span>
@@ -258,26 +362,54 @@
                   <el-icon class="is-loading"><Loading /></el-icon>
                   <span>正在获取位置信息...</span>
                 </div>
-                <el-form-item label="打卡位置" style="margin-top: 20px; width: 100%">
-                  <el-select v-model="selectedLocation" placeholder="请选择打卡位置" style="width: 100%">
-                    <el-option 
-                      v-for="location in checkinLocations" 
-                      :key="location.id" 
-                      :label="location.locationName" 
-                      :value="location" 
-                    />
-                  </el-select>
-                </el-form-item>
+                <template v-if="!isInternshipAttendance || isLeaveAttendance">
+                  <el-form-item label="打卡位置" style="margin-top: 20px; width: 100%">
+                    <el-select v-model="selectedLocation" :placeholder="isLeaveAttendance ? '请选择老师下发的考勤位置（可选）' : '请选择打卡位置'" style="width: 100%" clearable>
+                      <el-option 
+                        v-for="location in checkinLocations" 
+                        :key="location.id" 
+                        :label="location.locationName" 
+                        :value="location" 
+                      />
+                    </el-select>
+                  </el-form-item>
+                </template>
+                <template v-else-if="isInternshipAttendance">
+                  <el-form :model="internshipForm" label-width="90px" class="internship-form">
+                    <el-form-item label="打卡方式">
+                      <el-radio-group v-model="internshipForm.attendanceType">
+                        <el-radio label="INTERNSHIP_LOG">日志上报</el-radio>
+                        <el-radio label="OFF_CAMPUS_LOCATION">校外位置</el-radio>
+                      </el-radio-group>
+                    </el-form-item>
+                    <el-form-item label="实习单位">
+                      <el-input v-model="internshipForm.company" placeholder="请输入实习单位" />
+                    </el-form-item>
+                    <el-form-item label="日志日期">
+                      <el-date-picker v-model="internshipForm.logDate" type="date" placeholder="选择日志日期" style="width: 100%" />
+                    </el-form-item>
+                    <el-form-item label="实习日志" v-if="internshipForm.attendanceType === 'INTERNSHIP_LOG'">
+                      <el-input
+                        v-model="internshipForm.log"
+                        type="textarea"
+                        :rows="4"
+                        maxlength="1000"
+                        show-word-limit
+                        placeholder="请填写今日实习内容、工作地点或导师要求事项"
+                      />
+                    </el-form-item>
+                  </el-form>
+                </template>
                 <el-button 
                   type="primary" 
                   @click="handleCheckin" 
-                  :disabled="!currentLocation || !selectedLocation || checkingIn"
+                  :disabled="!canSubmitAttendance || checkingIn"
                   :loading="checkingIn"
                   style="margin-top: 20px; width: 200px"
                 >
                   {{ checkingIn ? '打卡中...' : '立即打卡' }}
                 </el-button>
-                <p class="checkin-tip" v-if="currentLocation && selectedLocation">点击按钮完成考勤打卡</p>
+                <p class="checkin-tip" v-if="canSubmitAttendance">点击按钮完成考勤打卡</p>
               </div>
             </el-card>
             
@@ -303,6 +435,11 @@
               <el-table :data="attendanceList" border style="width: 100%">
                 <el-table-column prop="id" label="ID" width="80" />
                 <el-table-column prop="cardNo" label="卡号" width="150" />
+                <el-table-column label="考勤类型" width="120">
+                  <template #default="{ row }">
+                    {{ getAttendanceTypeLabel(row.attendanceType) }}
+                  </template>
+                </el-table-column>
                 <el-table-column prop="status" label="考勤状态" width="100">
                   <template #default="{ row }">
                     <el-tag :type="getAttendanceStatusType(row.status)">
@@ -313,6 +450,18 @@
                 <el-table-column label="打卡地点">
                   <template #default="{ row }">
                     {{ row.actualLocation || '未知地点' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="实习信息" min-width="180">
+                  <template #default="{ row }">
+                    <span v-if="row.attendanceType && (row.attendanceType.startsWith('INTERNSHIP') || row.attendanceType === 'OFF_CAMPUS_LOCATION')">
+                      {{ row.internshipCompany || '未填写单位' }}
+                      <span v-if="row.internshipLogDate"> / {{ row.internshipLogDate }}</span>
+                    </span>
+                    <span v-else-if="row.attendanceType === 'LEAVE'">
+                      {{ row.leaveStartDate }} 至 {{ row.leaveEndDate }} / {{ row.leaveReason || '未填写原因' }}
+                    </span>
+                    <span v-else>-</span>
                   </template>
                 </el-table-column>
                 <el-table-column prop="recordTime" label="打卡时间" width="180" />
@@ -582,7 +731,7 @@ import { getCardInfo, getCardByUserNo } from '@/api/card'
 import { getConsumeList } from '@/api/consume'
 import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, returnBook } from '@/api/book'
 import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/access'
-import { getAttendanceList, createAttendance, getActiveLocations } from '@/api/attendance'
+import { getAttendanceList, createAttendance, getActiveLocations, submitInternshipApplication, submitLeaveApplication, getMyAttendanceApplications } from '@/api/attendance'
 import { getRechargeList, recharge, rechargeByCardNo } from '@/api/recharge'
 import { changePassword } from '@/api/admin'
 
@@ -595,7 +744,10 @@ const userInfo = reactive({
   username: '',
   gender: '',
   phone: '',
-  email: ''
+  email: '',
+  attendanceMode: 'CAMPUS',
+  attendanceStatus: 'ON_CAMPUS',
+  internshipCompany: ''
 })
 
 const cardInfo = reactive({
@@ -1199,6 +1351,66 @@ const locationError = ref('')
 const currentLatitude = ref(null)
 const currentLongitude = ref(null)
 const checkingIn = ref(false)
+const isInternshipAttendance = computed(() => userInfo.role === 'student' && userInfo.attendanceMode === 'INTERNSHIP')
+const isLeaveAttendance = computed(() => userInfo.role === 'student' && userInfo.attendanceStatus === 'LEAVE')
+const canSubmitAttendance = computed(() => {
+  if (!currentLocation.value || !currentLatitude.value || !currentLongitude.value) {
+    return false
+  }
+  if (isLeaveAttendance.value) {
+    return true
+  }
+  if (isInternshipAttendance.value) {
+    if (!internshipForm.company) {
+      return false
+    }
+    if (internshipForm.attendanceType === 'INTERNSHIP_LOG' && !internshipForm.log) {
+      return false
+    }
+    return true
+  }
+  return !!selectedLocation.value
+})
+
+const internshipForm = reactive({
+  attendanceType: 'OFF_CAMPUS_LOCATION',
+  company: '',
+  logDate: new Date(),
+  log: ''
+})
+
+const applicationTab = ref('internship')
+const internshipApplicationForm = reactive({
+  company: '',
+  startDate: new Date(),
+  reason: ''
+})
+const leaveApplicationForm = reactive({
+  dateRange: [],
+  reason: ''
+})
+const attendanceApplications = ref([])
+const submittingInternshipApplication = ref(false)
+const submittingLeaveApplication = ref(false)
+const hasActiveInternshipApplication = computed(() => {
+  return attendanceApplications.value.some(app => {
+    return app.applicationType === 'INTERNSHIP' && ['PENDING', 'APPROVED'].includes(app.status)
+  })
+})
+const hasOverlappingLeaveApplication = computed(() => {
+  const activeLeaveApplications = attendanceApplications.value.filter(app => {
+    return app.applicationType === 'LEAVE' && ['PENDING', 'APPROVED'].includes(app.status)
+  })
+  if (!activeLeaveApplications.length) {
+    return false
+  }
+  if (!leaveApplicationForm.dateRange || leaveApplicationForm.dateRange.length !== 2) {
+    return activeLeaveApplications.some(app => app.status === 'PENDING')
+  }
+  const startDate = formatDateValue(leaveApplicationForm.dateRange[0])
+  const endDate = formatDateValue(leaveApplicationForm.dateRange[1])
+  return activeLeaveApplications.some(app => app.startDate <= endDate && app.endDate >= startDate)
+})
 
 // 从后端获取的打卡位置
 const checkinLocations = ref([])
@@ -1272,30 +1484,48 @@ const handleCheckin = async () => {
     return
   }
   
-  if (!selectedLocation.value) {
+  if (!isInternshipAttendance.value && !isLeaveAttendance.value && !selectedLocation.value) {
     ElMessage.error('请选择打卡位置')
     return
   }
   
   // 检查是否在打卡范围内
-  if (!isInCheckinArea()) {
+  if (!isInternshipAttendance.value && !isLeaveAttendance.value && !isInCheckinArea()) {
     ElMessage.error('您不在允许的打卡范围内，请前往指定地点打卡')
     return
+  }
+
+  if (isInternshipAttendance.value && !isLeaveAttendance.value) {
+    if (!internshipForm.company) {
+      ElMessage.error('请输入实习单位')
+      return
+    }
+    if (internshipForm.attendanceType === 'INTERNSHIP_LOG' && !internshipForm.log) {
+      ElMessage.error('请填写实习日志')
+      return
+    }
   }
   
   checkingIn.value = true
   try {
     const res = await createAttendance({
       card_id: cardInfo.id,
-      location_id: selectedLocation.value.id,
+      location_id: isInternshipAttendance.value ? undefined : selectedLocation.value?.id,
       actual_location: currentLocation.value,
       actual_latitude: currentLatitude.value,
       actual_longitude: currentLongitude.value,
-      device_info: navigator.userAgent
+      device_info: navigator.userAgent,
+      attendance_type: isLeaveAttendance.value ? 'LEAVE' : (isInternshipAttendance.value ? internshipForm.attendanceType : 'CAMPUS_LOCATION'),
+      internship_company: isInternshipAttendance.value ? internshipForm.company : undefined,
+      internship_log: isInternshipAttendance.value ? internshipForm.log : undefined,
+      internship_log_date: isInternshipAttendance.value && internshipForm.logDate ? new Date(internshipForm.logDate).toISOString().split('T')[0] : undefined
     })
     
     if (res.code === 0) {
       ElMessage.success('打卡成功！')
+      if (isInternshipAttendance.value) {
+        internshipForm.log = ''
+      }
       // 重新加载考勤记录
       loadAttendanceData()
     } else {
@@ -1349,6 +1579,22 @@ const loadAttendanceData = async () => {
   }
 }
 
+const loadAttendanceApplications = async () => {
+  try {
+    if (!cardInfo.id) return
+    const res = await getMyAttendanceApplications({
+      card_id: cardInfo.id,
+      page: 1,
+      size: 10
+    })
+    if (res.code === 0) {
+      attendanceApplications.value = res.data.records || []
+    }
+  } catch (error) {
+    console.error('加载考勤申报记录失败:', error)
+  }
+}
+
 // 重置考勤表单
 const resetAttendanceForm = () => {
   attendanceForm.startDate = ''
@@ -1376,6 +1622,113 @@ const getAttendanceStatusType = (status) => {
     '缺勤': 'danger'
   }
   return map[status] || 'info'
+}
+
+const getAttendanceTypeLabel = (type) => {
+  const map = {
+    CAMPUS_LOCATION: '校内位置',
+    OFF_CAMPUS_LOCATION: '校外位置',
+    INTERNSHIP_LOG: '实习日志',
+    LEAVE: '请假'
+  }
+  return map[type] || '校内位置'
+}
+
+const formatDateValue = (value) => {
+  return value ? new Date(value).toISOString().split('T')[0] : ''
+}
+
+const handleSubmitInternshipApplication = async () => {
+  if (!cardInfo.id) {
+    ElMessage.error('请先加载校园卡信息')
+    return
+  }
+  if (!internshipApplicationForm.company) {
+    ElMessage.error('请输入实习单位')
+    return
+  }
+  try {
+    submittingInternshipApplication.value = true
+    const res = await submitInternshipApplication({
+      cardId: cardInfo.id,
+      internshipCompany: internshipApplicationForm.company,
+      startDate: formatDateValue(internshipApplicationForm.startDate),
+      reason: internshipApplicationForm.reason
+    })
+      if (res.code === 0) {
+        ElMessage.success('实习申报已提交，请等待老师审核')
+        loadAttendanceApplications()
+      } else {
+        ElMessage.error(res.msg || '实习申报失败')
+      }
+  } catch (error) {
+    console.error('实习申报失败:', error)
+    ElMessage.error(error.response?.data?.msg || '实习申报失败')
+  } finally {
+    submittingInternshipApplication.value = false
+  }
+}
+
+const handleSubmitLeaveApplication = async () => {
+  if (!cardInfo.id) {
+    ElMessage.error('请先加载校园卡信息')
+    return
+  }
+  if (!leaveApplicationForm.dateRange || leaveApplicationForm.dateRange.length !== 2) {
+    ElMessage.error('请选择请假日期')
+    return
+  }
+  const startDate = new Date(leaveApplicationForm.dateRange[0])
+  const endDate = new Date(leaveApplicationForm.dateRange[1])
+  const leaveDays = Math.floor((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1
+  if (leaveDays < 1 || leaveDays > 3) {
+    ElMessage.warning('线上请假仅支持1-3天，超过3天请走线下流程办理')
+    return
+  }
+  if (!leaveApplicationForm.reason) {
+    ElMessage.error('请输入请假原因')
+    return
+  }
+  try {
+    submittingLeaveApplication.value = true
+    const res = await submitLeaveApplication({
+      cardId: cardInfo.id,
+      startDate: formatDateValue(startDate),
+      endDate: formatDateValue(endDate),
+      reason: leaveApplicationForm.reason
+    })
+    if (res.code === 0) {
+      ElMessage.success('请假申请已提交，请等待管理员审核')
+      leaveApplicationForm.dateRange = []
+      leaveApplicationForm.reason = ''
+      loadAttendanceApplications()
+    } else {
+      ElMessage.error(res.msg || '请假申请失败')
+    }
+  } catch (error) {
+    console.error('请假申请失败:', error)
+    ElMessage.error(error.response?.data?.msg || '请假申请失败')
+  } finally {
+    submittingLeaveApplication.value = false
+  }
+}
+
+const getApplicationStatusType = (status) => {
+  const map = {
+    PENDING: 'warning',
+    APPROVED: 'success',
+    REJECTED: 'danger'
+  }
+  return map[status] || 'info'
+}
+
+const getApplicationStatusText = (status) => {
+  const map = {
+    PENDING: '待审核',
+    APPROVED: '已通过',
+    REJECTED: '已拒绝'
+  }
+  return map[status] || '未知'
 }
 
 const logout = () => {
@@ -1645,6 +1998,7 @@ onMounted(async () => {
   loadConsumeData()
   loadAccessData()
   loadAttendanceData()
+  loadAttendanceApplications()
   loadRechargeData()
   loadActiveLocations()
   getCurrentLocation()
@@ -1785,6 +2139,12 @@ onMounted(async () => {
   padding: 30px 0;
 }
 
+.internship-form {
+  max-width: 480px;
+  margin: 20px auto 0;
+  text-align: left;
+}
+
 .location-info {
   display: flex;
   align-items: center;
@@ -1817,6 +2177,12 @@ onMounted(async () => {
 
 .checkin-tip {
   margin-top: 10px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.leave-checkin-tip {
+  margin: 20px auto 0;
   color: #606266;
   font-size: 14px;
 }

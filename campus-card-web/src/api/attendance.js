@@ -14,6 +14,26 @@ export const getAttendanceStatistics = (params) => {
   return request.get('/attendance/statistics', { params })
 }
 
+export const submitInternshipApplication = (data) => {
+  return request.post('/attendance/application/internship', data)
+}
+
+export const submitLeaveApplication = (data) => {
+  return request.post('/attendance/application/leave', data)
+}
+
+export const getMyAttendanceApplications = (params) => {
+  return request.get('/attendance/application/my', { params })
+}
+
+export const getAttendanceApplications = (params) => {
+  return request.get('/attendance/application/list', { params })
+}
+
+export const reviewAttendanceApplication = (params) => {
+  return request.post('/attendance/application/review', null, { params })
+}
+
 // 打卡位置相关接口
 export const createLocation = (data) => {
   return request.post('/attendance/location', data)

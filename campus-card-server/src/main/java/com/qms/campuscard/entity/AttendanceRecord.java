@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -29,6 +30,22 @@ public class AttendanceRecord {
 
     private String deviceInfo;
 
+    private String attendanceType;
+
+    private String internshipCompany;
+
+    private String internshipLog;
+
+    private LocalDate internshipLogDate;
+
+    private Long leaveApplicationId;
+
+    private String leaveReason;
+
+    private LocalDate leaveStartDate;
+
+    private LocalDate leaveEndDate;
+
     private LocalDateTime recordTime;
 
     private Integer isDeleted;
@@ -40,4 +57,7 @@ public class AttendanceRecord {
     // 非数据库字段，用于存储校园卡卡号
     @TableField(exist = false)
     private String cardNo;
+
+    @TableField(exist = false)
+    private String attendanceMode;
 }

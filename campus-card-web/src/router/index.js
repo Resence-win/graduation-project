@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import AttendanceApplicationList from '@/views/attendance/AttendanceApplicationList.vue'
 
 const routes = [
   {
@@ -116,6 +117,12 @@ const routes = [
         meta: { title: '打卡位置管理', requiresAdmin: false }
       },
       {
+        path: 'attendance/application',
+        name: 'AttendanceApplication',
+        component: AttendanceApplicationList,
+        meta: { title: '申报审批', allowedRoles: ['admin', 'teacher'] }
+      },
+      {
         path: 'commute',
         name: 'Commute',
         component: () => import('@/views/commute/CommuteList.vue'),
@@ -166,6 +173,12 @@ router.beforeEach((to, from, next) => {
   
   if (to.meta.requiresAdmin && user && user.role !== 'admin') {
     // 非管理员尝试访问管理员页面，跳转到个人中心
+    ElMessage.warning('无权限访问该页面')
+    next('/profile')
+    return
+  }
+
+  if (to.meta.allowedRoles && user && !to.meta.allowedRoles.includes(user.role)) {
     ElMessage.warning('无权限访问该页面')
     next('/profile')
     return

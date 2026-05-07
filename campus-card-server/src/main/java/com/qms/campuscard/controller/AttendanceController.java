@@ -2,8 +2,10 @@ package com.qms.campuscard.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.qms.campuscard.common.Result;
+import com.qms.campuscard.entity.AttendanceApplication;
 import com.qms.campuscard.entity.AttendanceLocation;
 import com.qms.campuscard.entity.AttendanceRecord;
+import com.qms.campuscard.service.AttendanceApplicationService;
 import com.qms.campuscard.service.AttendanceLocationService;
 import com.qms.campuscard.service.AttendanceRecordService;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +21,9 @@ public class AttendanceController {
     
     @Resource
     private AttendanceLocationService attendanceLocationService;
+
+    @Resource
+    private AttendanceApplicationService attendanceApplicationService;
 
     // 打卡位置相关接口
     @PostMapping("/location")
@@ -72,21 +77,28 @@ public class AttendanceController {
     public Result<IPage<AttendanceRecord>> getAttendanceRecords(
             @RequestParam(required = false) Long card_id,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String start_date,
+            @RequestParam(required = false) String end_date,
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size) {
-        IPage<AttendanceRecord> attendanceRecords = attendanceRecordService.getAttendanceRecords(card_id, status, page, size);
+        IPage<AttendanceRecord> attendanceRecords = attendanceRecordService.getAttendanceRecords(card_id, status, start_date, end_date, page, size);
         return Result.success(attendanceRecords);
     }
 
     @PostMapping("/checkin")
     public Result<AttendanceRecord> createAttendance(
             @RequestParam Long card_id,
-            @RequestParam Long location_id,
+            @RequestParam(required = false) Long location_id,
             @RequestParam String actual_location,
             @RequestParam Double actual_latitude,
             @RequestParam Double actual_longitude,
-            @RequestParam(required = false) String device_info) {
-        AttendanceRecord attendanceRecord = attendanceRecordService.createAttendance(card_id, location_id, actual_location, actual_latitude, actual_longitude, device_info);
+            @RequestParam(required = false) String device_info,
+            @RequestParam(required = false) String attendance_type,
+            @RequestParam(required = false) String internship_company,
+            @RequestParam(required = false) String internship_log,
+            @RequestParam(required = false) String internship_log_date) {
+        AttendanceRecord attendanceRecord = attendanceRecordService.createAttendance(card_id, location_id, actual_location, actual_latitude, actual_longitude, device_info,
+                attendance_type, internship_company, internship_log, internship_log_date);
         return Result.success(attendanceRecord);
     }
 
@@ -107,5 +119,41 @@ public class AttendanceController {
             @RequestParam(required = false, defaultValue = "10") Integer size) {
         IPage<AttendanceRecord> records = attendanceRecordService.getAttendanceRecordsByLocationId(locationId, page, size);
         return Result.success(records);
+    }
+
+    @PostMapping("/application/internship")
+    public Result<AttendanceApplication> submitInternshipApplication(@RequestBody AttendanceApplication application) {
+        return Result.success(attendanceApplicationService.submitInternshipApplication(application));
+    }
+
+    @PostMapping("/application/leave")
+    public Result<AttendanceApplication> submitLeaveApplication(@RequestBody AttendanceApplication application) {
+        return Result.success(attendanceApplicationService.submitLeaveApplication(application));
+    }
+
+    @GetMapping("/application/my")
+    public Result<IPage<AttendanceApplication>> getMyApplications(
+            @RequestParam Long card_id,
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer size) {
+        return Result.success(attendanceApplicationService.getApplicationsByCardId(card_id, page, size));
+    }
+
+    @GetMapping("/application/list")
+    public Result<IPage<AttendanceApplication>> getApplications(
+            @RequestParam(required = false) String application_type,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer size) {
+        return Result.success(attendanceApplicationService.getApplications(application_type, status, page, size));
+    }
+
+    @PostMapping("/application/review")
+    public Result<AttendanceApplication> reviewApplication(
+            @RequestParam Long application_id,
+            @RequestParam String status,
+            @RequestParam(required = false) Long reviewer_id,
+            @RequestParam(required = false) String review_remark) {
+        return Result.success(attendanceApplicationService.reviewApplication(application_id, status, reviewer_id, review_remark));
     }
 }

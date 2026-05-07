@@ -41,8 +41,23 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="考勤类型" width="120">
+          <template #default="{ row }">
+            {{ getAttendanceTypeLabel(row.attendanceType) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="locationName" label="打卡位置" />
         <el-table-column prop="actualLocation" label="实际打卡地点" />
+        <el-table-column prop="internshipCompany" label="实习单位" width="160" />
+        <el-table-column prop="internshipLogDate" label="日志日期" width="120" />
+        <el-table-column label="请假信息" min-width="220">
+          <template #default="{ row }">
+            <span v-if="row.attendanceType === 'LEAVE'">
+              {{ row.leaveStartDate }} 至 {{ row.leaveEndDate }} / {{ row.leaveReason || '未填写原因' }}
+            </span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="actualLatitude" label="实际纬度" width="120" />
         <el-table-column prop="actualLongitude" label="实际经度" width="120" />
         <el-table-column prop="deviceInfo" label="设备信息" />
@@ -159,6 +174,16 @@ const getStatusType = (status) => {
     '缺勤': 'danger'
   }
   return map[status] || 'info'
+}
+
+const getAttendanceTypeLabel = (type) => {
+  const map = {
+    CAMPUS_LOCATION: '校内位置',
+    OFF_CAMPUS_LOCATION: '校外位置',
+    INTERNSHIP_LOG: '实习日志',
+    LEAVE: '请假'
+  }
+  return map[type] || '校内位置'
 }
 
 const loadData = async () => {

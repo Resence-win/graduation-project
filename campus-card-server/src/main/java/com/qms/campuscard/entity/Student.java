@@ -42,6 +42,15 @@ public class Student implements Serializable {
     @TableField("phone")
     private String phone;
 
+    @TableField("attendance_mode")
+    private String attendanceMode;
+
+    @TableField("attendance_status")
+    private String attendanceStatus;
+
+    @TableField("internship_company")
+    private String internshipCompany;
+
     @TableField("status")
     private Integer status;
 

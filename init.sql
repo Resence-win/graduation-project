@@ -15,6 +15,9 @@ CREATE TABLE student (
     major VARCHAR(100),
     class_name VARCHAR(50),
     phone VARCHAR(20),
+    attendance_mode VARCHAR(20) DEFAULT 'CAMPUS',
+    attendance_status VARCHAR(20) DEFAULT 'ON_CAMPUS',
+    internship_company VARCHAR(200),
     status INT DEFAULT 1,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP,
@@ -30,6 +33,9 @@ COMMENT ON COLUMN student.college IS '学院';
 COMMENT ON COLUMN student.major IS '专业';
 COMMENT ON COLUMN student.class_name IS '班级';
 COMMENT ON COLUMN student.phone IS '手机号';
+COMMENT ON COLUMN student.attendance_mode IS '考勤模式(CAMPUS: 在校考勤, INTERNSHIP: 校外实习)';
+COMMENT ON COLUMN student.attendance_status IS '考勤状态(ON_CAMPUS: 在校, INTERNSHIP: 外出实习, LEAVE: 已请假)';
+COMMENT ON COLUMN student.internship_company IS '实习单位';
 COMMENT ON COLUMN student.status IS '状态(1正常)';
 COMMENT ON COLUMN student.create_time IS '创建时间';
 COMMENT ON COLUMN student.update_time IS '更新时间';
@@ -464,6 +470,14 @@ CREATE TABLE attendance_record (
     actual_latitude DECIMAL(10, 6),
     actual_longitude DECIMAL(10, 6),
     device_info VARCHAR(255),
+    attendance_type VARCHAR(30) DEFAULT 'CAMPUS_LOCATION',
+    internship_company VARCHAR(200),
+    internship_log TEXT,
+    internship_log_date DATE,
+    leave_application_id BIGINT,
+    leave_reason VARCHAR(1000),
+    leave_start_date DATE,
+    leave_end_date DATE,
     record_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted INT DEFAULT 0
 );
@@ -477,8 +491,55 @@ COMMENT ON COLUMN attendance_record.actual_location IS '实际打卡地点';
 COMMENT ON COLUMN attendance_record.actual_latitude IS '实际纬度';
 COMMENT ON COLUMN attendance_record.actual_longitude IS '实际经度';
 COMMENT ON COLUMN attendance_record.device_info IS '设备信息';
+COMMENT ON COLUMN attendance_record.attendance_type IS '考勤类型(CAMPUS_LOCATION: 校内位置, OFF_CAMPUS_LOCATION: 校外位置, INTERNSHIP_LOG: 实习日志, LEAVE: 已请假)';
+COMMENT ON COLUMN attendance_record.internship_company IS '实习单位';
+COMMENT ON COLUMN attendance_record.internship_log IS '实习日志内容';
+COMMENT ON COLUMN attendance_record.internship_log_date IS '实习日志日期';
+COMMENT ON COLUMN attendance_record.leave_application_id IS '请假申请ID';
+COMMENT ON COLUMN attendance_record.leave_reason IS '请假原因';
+COMMENT ON COLUMN attendance_record.leave_start_date IS '请假开始日期';
+COMMENT ON COLUMN attendance_record.leave_end_date IS '请假结束日期';
 COMMENT ON COLUMN attendance_record.record_time IS '记录时间';
 COMMENT ON COLUMN attendance_record.is_deleted IS '是否删除';
+
+-- ========================
+-- 18. 通勤车线路表
+-- ========================
+DROP TABLE IF EXISTS attendance_application;
+CREATE TABLE attendance_application (
+    id BIGSERIAL PRIMARY KEY,
+    student_id BIGINT,
+    card_id BIGINT,
+    application_type VARCHAR(30),
+    internship_company VARCHAR(200),
+    reason VARCHAR(1000),
+    start_date DATE,
+    end_date DATE,
+    status VARCHAR(20) DEFAULT 'PENDING',
+    reviewer_id BIGINT,
+    review_time TIMESTAMP,
+    review_remark VARCHAR(1000),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE attendance_application IS '考勤申报表';
+COMMENT ON COLUMN attendance_application.id IS '主键ID';
+COMMENT ON COLUMN attendance_application.student_id IS '学生ID';
+COMMENT ON COLUMN attendance_application.card_id IS '卡ID';
+COMMENT ON COLUMN attendance_application.application_type IS '申报类型(INTERNSHIP: 外出实习, LEAVE: 请假)';
+COMMENT ON COLUMN attendance_application.internship_company IS '实习单位';
+COMMENT ON COLUMN attendance_application.reason IS '申报原因或说明';
+COMMENT ON COLUMN attendance_application.start_date IS '开始日期';
+COMMENT ON COLUMN attendance_application.end_date IS '结束日期';
+COMMENT ON COLUMN attendance_application.status IS '状态(PENDING: 待审核, APPROVED: 已通过, REJECTED: 已拒绝)';
+COMMENT ON COLUMN attendance_application.reviewer_id IS '审核人ID';
+COMMENT ON COLUMN attendance_application.review_time IS '审核时间';
+COMMENT ON COLUMN attendance_application.review_remark IS '审核备注';
+COMMENT ON COLUMN attendance_application.create_time IS '创建时间';
+COMMENT ON COLUMN attendance_application.update_time IS '更新时间';
+COMMENT ON COLUMN attendance_application.is_deleted IS '是否删除';
 
 -- ========================
 -- 18. 通勤车线路表
@@ -702,6 +763,8 @@ CREATE INDEX idx_account_flow_time ON account_flow(create_time);
 
 -- 用户相关索引
 CREATE INDEX idx_student_no ON student(student_no);
+CREATE INDEX idx_student_attendance_mode ON student(attendance_mode);
+CREATE INDEX idx_student_attendance_status ON student(attendance_status);
 CREATE INDEX idx_teacher_no ON teacher(teacher_no);
 
 -- 商户相关索引
@@ -725,6 +788,13 @@ CREATE INDEX idx_borrow_application_status ON borrow_application(status);
 CREATE INDEX idx_borrow_application_time ON borrow_application(application_time);
 CREATE INDEX idx_attendance_card_id ON attendance_record(card_id);
 CREATE INDEX idx_attendance_time ON attendance_record(record_time);
+CREATE INDEX idx_attendance_type ON attendance_record(attendance_type);
+CREATE INDEX idx_attendance_internship_log_date ON attendance_record(internship_log_date);
+CREATE INDEX idx_attendance_leave_application_id ON attendance_record(leave_application_id);
+CREATE INDEX idx_attendance_application_card_id ON attendance_application(card_id);
+CREATE INDEX idx_attendance_application_type ON attendance_application(application_type);
+CREATE INDEX idx_attendance_application_status ON attendance_application(status);
+CREATE INDEX idx_attendance_application_date ON attendance_application(start_date, end_date);
 -- 通勤车相关索引
 CREATE INDEX idx_commute_route_status ON commute_route(status);
 CREATE INDEX idx_commute_vehicle_plate ON commute_vehicle(plate_number);
