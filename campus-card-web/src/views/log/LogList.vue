@@ -4,6 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>系统日志</span>
+          <el-button type="success" @click="handleExport">导出日志</el-button>
         </div>
       </template>
       
@@ -13,6 +14,9 @@
         </el-form-item>
         <el-form-item label="操作类型">
           <el-input v-model="searchForm.operationType" placeholder="请输入操作类型" clearable />
+        </el-form-item>
+        <el-form-item label="操作表">
+          <el-input v-model="searchForm.targetTable" placeholder="请输入操作表" clearable />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
@@ -54,13 +58,15 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { getLogList } from '@/api/log'
+import { ElMessage } from 'element-plus'
+import { getLogList, exportLogs } from '@/api/log'
 
 const tableData = ref([])
 
 const searchForm = reactive({
   operatorId: null,
-  operationType: null
+  operationType: null,
+  targetTable: null
 })
 
 const pagination = reactive({
@@ -74,7 +80,7 @@ const loadData = async () => {
     const res = await getLogList({
       page: pagination.page,
       size: pagination.size,
-      ...searchForm
+      ...buildSearchParams()
     })
     if (res.code === 0) {
       tableData.value = res.data.records || []
@@ -93,6 +99,7 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.operatorId = null
   searchForm.operationType = null
+  searchForm.targetTable = null
   loadData()
 }
 
@@ -104,6 +111,33 @@ const handleSizeChange = (val) => {
 const handleCurrentChange = (val) => {
   pagination.page = val
   loadData()
+}
+
+const buildSearchParams = () => {
+  return {
+    operator_id: searchForm.operatorId,
+    operation_type: searchForm.operationType,
+    target_table: searchForm.targetTable
+  }
+}
+
+const handleExport = async () => {
+  try {
+    const res = await exportLogs(buildSearchParams())
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `系统日志_${new Date().toISOString().slice(0, 10)}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 onMounted(() => {

@@ -11,6 +11,7 @@ import com.qms.campuscard.service.AttendanceRecordService;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/attendance")
@@ -110,6 +111,14 @@ public class AttendanceController {
             @RequestParam(required = false, defaultValue = "10") Integer size) {
         IPage<AttendanceRecord> attendanceStatistics = attendanceRecordService.getAttendanceStatistics(start_date, end_date, page, size);
         return Result.success(attendanceStatistics);
+    }
+
+    @GetMapping("/summary")
+    public Result<Map<String, Long>> getAttendanceSummary(
+            @RequestParam(required = false) String start_date,
+            @RequestParam(required = false) String end_date) {
+        Map<String, Long> summary = attendanceRecordService.getAttendanceSummary(start_date, end_date);
+        return Result.success(summary);
     }
 
     @GetMapping("/location/{locationId}/records")

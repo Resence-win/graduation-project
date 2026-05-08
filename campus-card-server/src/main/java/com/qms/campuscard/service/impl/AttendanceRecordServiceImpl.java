@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.Resource;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class AttendanceRecordServiceImpl implements AttendanceRecordService {
@@ -53,7 +55,7 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         if (cardId != null) {
             queryWrapper.eq("card_id", cardId);
         }
-        if (status != null) {
+        if (status != null && !status.trim().isEmpty()) {
             queryWrapper.eq("status", status);
         }
         if (startDate != null && !startDate.trim().isEmpty()) {
@@ -276,10 +278,10 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         Page<AttendanceRecord> pageParam = new Page<>(page, size);
         QueryWrapper<AttendanceRecord> queryWrapper = new QueryWrapper<>();
 
-        if (startDate != null) {
+        if (startDate != null && !startDate.trim().isEmpty()) {
             queryWrapper.ge("record_time", startDate);
         }
-        if (endDate != null) {
+        if (endDate != null && !endDate.trim().isEmpty()) {
             // 构造正确的时间戳格式
             queryWrapper.le("record_time", endDate + "T23:59:59");
         }
@@ -291,6 +293,47 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         fillRecordExtraInfo(result);
         
         return result;
+    }
+
+    @Override
+    public Map<String, Long> getAttendanceSummary(String startDate, String endDate) {
+        QueryWrapper<AttendanceRecord> queryWrapper = new QueryWrapper<>();
+
+        if (startDate != null && !startDate.trim().isEmpty()) {
+            queryWrapper.ge("record_time", startDate);
+        }
+        if (endDate != null && !endDate.trim().isEmpty()) {
+            queryWrapper.le("record_time", endDate + "T23:59:59");
+        }
+
+        queryWrapper.eq("is_deleted", 0);
+
+        long total = attendanceRecordMapper.selectCount(queryWrapper);
+
+        Map<String, Long> summary = new HashMap<>();
+        summary.put("total", total);
+        summary.put("normal", countByStatus(startDate, endDate, "正常"));
+        summary.put("late", countByStatus(startDate, endDate, "迟到"));
+        summary.put("early", countByStatus(startDate, endDate, "早退"));
+        summary.put("absent", countByStatus(startDate, endDate, "缺勤"));
+
+        return summary;
+    }
+
+    private Long countByStatus(String startDate, String endDate, String status) {
+        QueryWrapper<AttendanceRecord> queryWrapper = new QueryWrapper<>();
+
+        if (startDate != null && !startDate.trim().isEmpty()) {
+            queryWrapper.ge("record_time", startDate);
+        }
+        if (endDate != null && !endDate.trim().isEmpty()) {
+            queryWrapper.le("record_time", endDate + "T23:59:59");
+        }
+
+        queryWrapper.eq("status", status);
+        queryWrapper.eq("is_deleted", 0);
+
+        return attendanceRecordMapper.selectCount(queryWrapper);
     }
 
     private void fillRecordExtraInfo(IPage<AttendanceRecord> result) {

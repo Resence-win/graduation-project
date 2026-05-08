@@ -14,6 +14,10 @@ export const getAttendanceStatistics = (params) => {
   return request.get('/attendance/statistics', { params })
 }
 
+export const getAttendanceSummary = (params) => {
+  return request.get('/attendance/summary', { params })
+}
+
 export const submitInternshipApplication = (data) => {
   return request.post('/attendance/application/internship', data)
 }

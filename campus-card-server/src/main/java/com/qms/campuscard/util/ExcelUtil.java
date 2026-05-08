@@ -5,6 +5,7 @@ import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.annotation.format.DateTimeFormat;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
+import com.qms.campuscard.entity.OperationLog;
 import com.qms.campuscard.entity.Student;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -37,6 +38,25 @@ public class ExcelUtil {
         // 导出Excel
         EasyExcel.write(response.getOutputStream(), StudentExportDto.class)
                 .sheet("学生信息")
+                .doWrite(exportDtos);
+    }
+
+    /**
+     * 导出系统操作日志到Excel
+     */
+    public static void exportOperationLogs(HttpServletResponse response, List<OperationLog> logs) throws IOException {
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding("utf-8");
+        String fileName = URLEncoder.encode("系统操作日志", StandardCharsets.UTF_8).replaceAll("\\+", "%");
+        response.setHeader("Content-disposition", "attachment;filename=" + fileName + ".xlsx");
+
+        List<OperationLogExportDto> exportDtos = new ArrayList<>();
+        for (OperationLog log : logs) {
+            exportDtos.add(new OperationLogExportDto(log));
+        }
+
+        EasyExcel.write(response.getOutputStream(), OperationLogExportDto.class)
+                .sheet("系统操作日志")
                 .doWrite(exportDtos);
     }
 
@@ -157,6 +177,123 @@ public class ExcelUtil {
 
         public void setClassName(String className) {
             this.className = className;
+        }
+    }
+
+    /**
+     * 操作日志导出DTO类，控制导出字段和格式
+     */
+    public static class OperationLogExportDto {
+        @ExcelProperty("ID")
+        private Long id;
+
+        @ExcelProperty("操作人ID")
+        private Long operatorId;
+
+        @ExcelProperty("操作人")
+        private String operatorName;
+
+        @ExcelProperty("操作类型")
+        private String operationType;
+
+        @ExcelProperty("操作表")
+        private String targetTable;
+
+        @ExcelProperty("目标ID")
+        private Long targetId;
+
+        @ExcelProperty("目标")
+        private String targetName;
+
+        @ExcelProperty("操作内容")
+        private String content;
+
+        @ExcelProperty("操作时间")
+        @DateTimeFormat("yyyy-MM-dd HH:mm:ss")
+        private LocalDateTime createTime;
+
+        public OperationLogExportDto(OperationLog log) {
+            this.id = log.getId();
+            this.operatorId = log.getOperatorId();
+            this.operatorName = log.getOperatorName();
+            this.operationType = log.getOperationType();
+            this.targetTable = log.getTargetTable();
+            this.targetId = log.getTargetId();
+            this.targetName = log.getTargetName();
+            this.content = log.getContent();
+            this.createTime = log.getCreateTime();
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public Long getOperatorId() {
+            return operatorId;
+        }
+
+        public void setOperatorId(Long operatorId) {
+            this.operatorId = operatorId;
+        }
+
+        public String getOperatorName() {
+            return operatorName;
+        }
+
+        public void setOperatorName(String operatorName) {
+            this.operatorName = operatorName;
+        }
+
+        public String getOperationType() {
+            return operationType;
+        }
+
+        public void setOperationType(String operationType) {
+            this.operationType = operationType;
+        }
+
+        public String getTargetTable() {
+            return targetTable;
+        }
+
+        public void setTargetTable(String targetTable) {
+            this.targetTable = targetTable;
+        }
+
+        public Long getTargetId() {
+            return targetId;
+        }
+
+        public void setTargetId(Long targetId) {
+            this.targetId = targetId;
+        }
+
+        public String getTargetName() {
+            return targetName;
+        }
+
+        public void setTargetName(String targetName) {
+            this.targetName = targetName;
+        }
+
+        public String getContent() {
+            return content;
+        }
+
+        public void setContent(String content) {
+            this.content = content;
+        }
+
+        public LocalDateTime getCreateTime() {
+            return createTime;
+        }
+
+        public void setCreateTime(LocalDateTime createTime) {
+            this.createTime = createTime;
         }
     }
 

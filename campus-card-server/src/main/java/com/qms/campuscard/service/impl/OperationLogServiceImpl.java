@@ -17,6 +17,7 @@ import com.qms.campuscard.service.OperationLogService;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
+import java.util.List;
 
 @Service
 public class OperationLogServiceImpl implements OperationLogService {
@@ -46,24 +47,42 @@ public class OperationLogServiceImpl implements OperationLogService {
         }
 
         Page<OperationLog> pageParam = new Page<>(page, size);
+        QueryWrapper<OperationLog> queryWrapper = buildQueryWrapper(operatorId, operationType, targetTable);
+        IPage<OperationLog> result = operationLogMapper.selectPage(pageParam, queryWrapper);
+        fillDisplayNames(result.getRecords());
+        
+        return result;
+    }
+
+    @Override
+    public List<OperationLog> exportOperationLogs(Long operatorId, String operationType, String targetTable) {
+        QueryWrapper<OperationLog> queryWrapper = buildQueryWrapper(operatorId, operationType, targetTable);
+        List<OperationLog> logs = operationLogMapper.selectList(queryWrapper);
+        fillDisplayNames(logs);
+        return logs;
+    }
+
+    private QueryWrapper<OperationLog> buildQueryWrapper(Long operatorId, String operationType, String targetTable) {
         QueryWrapper<OperationLog> queryWrapper = new QueryWrapper<>();
 
         if (operatorId != null) {
             queryWrapper.eq("operator_id", operatorId);
         }
-        if (operationType != null) {
+        if (operationType != null && !operationType.isEmpty()) {
             queryWrapper.eq("operation_type", operationType);
         }
-        if (targetTable != null) {
+        if (targetTable != null && !targetTable.isEmpty()) {
             queryWrapper.eq("target_table", targetTable);
         }
 
         queryWrapper.eq("is_deleted", 0);
         queryWrapper.orderByDesc("create_time");
-        IPage<OperationLog> result = operationLogMapper.selectPage(pageParam, queryWrapper);
-        
+        return queryWrapper;
+    }
+
+    private void fillDisplayNames(List<OperationLog> logs) {
         // 填充操作人名称和目标名称
-        for (OperationLog log : result.getRecords()) {
+        for (OperationLog log : logs) {
             // 填充操作人名称
             if (log.getOperatorId() != null) {
                 // 尝试从管理员表查询
@@ -143,8 +162,6 @@ public class OperationLogServiceImpl implements OperationLogService {
                 }
             }
         }
-        
-        return result;
     }
 
     @Override

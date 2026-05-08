@@ -3,10 +3,56 @@
     <el-card>
       <template #header>
         <div class="card-header">
+          <span>考勤统计</span>
+        </div>
+      </template>
+
+      <el-form :inline="true" :model="statForm">
+        <el-form-item label="开始日期">
+          <el-date-picker v-model="statForm.startDate" type="date" placeholder="选择开始日期" />
+        </el-form-item>
+        <el-form-item label="结束日期">
+          <el-date-picker v-model="statForm.endDate" type="date" placeholder="选择结束日期" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :loading="statLoading" @click="handleStatistics">统计</el-button>
+          <el-button @click="handleStatReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+
+      <div v-loading="statLoading" class="stat-content">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">总打卡次数</div>
+            <div class="stat-value">{{ statData.total }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">正常</div>
+            <div class="stat-value success">{{ statData.normal }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">迟到</div>
+            <div class="stat-value warning">{{ statData.late }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">早退</div>
+            <div class="stat-value warning">{{ statData.early }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">缺勤</div>
+            <div class="stat-value danger">{{ statData.absent }}</div>
+          </div>
+        </div>
+      </div>
+    </el-card>
+
+    <el-card style="margin-top: 20px">
+      <template #header>
+        <div class="card-header">
           <span>考勤管理</span>
         </div>
       </template>
-      
+
       <el-form :inline="true" :model="searchForm">
         <el-form-item label="卡号">
           <el-input v-model="searchForm.cardId" placeholder="请输入卡号" clearable />
@@ -31,7 +77,7 @@
         </el-form-item>
       </el-form>
       
-      <el-table :data="tableData" border style="width: 100%">
+      <el-table v-loading="listLoading" :data="tableData" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="cardNo" label="卡号" width="150" />
         <el-table-column prop="status" label="考勤状态" width="100">
@@ -75,71 +121,17 @@
         style="margin-top: 20px; justify-content: flex-end"
       />
     </el-card>
-    
-    <el-card style="margin-top: 20px">
-      <template #header>
-        <div class="card-header">
-          <span>考勤统计</span>
-        </div>
-      </template>
-      
-      <el-form :inline="true" :model="statForm">
-        <el-form-item label="开始日期">
-          <el-date-picker v-model="statForm.startDate" type="date" placeholder="选择开始日期" />
-        </el-form-item>
-        <el-form-item label="结束日期">
-          <el-date-picker v-model="statForm.endDate" type="date" placeholder="选择结束日期" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleStatistics">统计</el-button>
-        </el-form-item>
-      </el-form>
-      
-      <div class="stat-content">
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <el-card shadow="hover">
-              <div class="stat-item">
-                <div class="stat-label">总打卡次数</div>
-                <div class="stat-value">{{ statData.total }}</div>
-              </div>
-            </el-card>
-          </el-col>
-          <el-col :span="6">
-            <el-card shadow="hover">
-              <div class="stat-item">
-                <div class="stat-label">正常</div>
-                <div class="stat-value">{{ statData.normal }}</div>
-              </div>
-            </el-card>
-          </el-col>
-          <el-col :span="6">
-            <el-card shadow="hover">
-              <div class="stat-item">
-                <div class="stat-label">迟到</div>
-                <div class="stat-value">{{ statData.late }}</div>
-              </div>
-            </el-card>
-          </el-col>
-          <el-col :span="6">
-            <el-card shadow="hover">
-              <div class="stat-item">
-                <div class="stat-label">缺勤</div>
-                <div class="stat-value">{{ statData.absent }}</div>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </div>
-    </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { getAttendanceList, getAttendanceStatistics } from '@/api/attendance'
+import { ElMessage } from 'element-plus'
+import { getAttendanceList, getAttendanceSummary } from '@/api/attendance'
 
 const tableData = ref([])
+const listLoading = ref(false)
+const statLoading = ref(false)
 
 const searchForm = reactive({
   cardId: null,
@@ -163,8 +155,25 @@ const statData = reactive({
   total: 0,
   normal: 0,
   late: 0,
+  early: 0,
   absent: 0
 })
+
+const formatDate = (date) => {
+  if (!date) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const validateDateRange = (startDate, endDate) => {
+  if (startDate && endDate && startDate.getTime() > endDate.getTime()) {
+    ElMessage.warning('开始日期不能晚于结束日期')
+    return false
+  }
+  return true
+}
 
 const getStatusType = (status) => {
   const map = {
@@ -187,14 +196,17 @@ const getAttendanceTypeLabel = (type) => {
 }
 
 const loadData = async () => {
+  if (!validateDateRange(searchForm.startDate, searchForm.endDate)) return
+
   try {
+    listLoading.value = true
     const params = {
       page: pagination.page,
       size: pagination.size,
       card_id: searchForm.cardId,
       status: searchForm.status,
-      start_date: searchForm.startDate ? searchForm.startDate.toISOString().split('T')[0] : '',
-      end_date: searchForm.endDate ? searchForm.endDate.toISOString().split('T')[0] : ''
+      start_date: formatDate(searchForm.startDate),
+      end_date: formatDate(searchForm.endDate)
     }
     const res = await getAttendanceList(params)
     if (res.code === 0) {
@@ -203,6 +215,8 @@ const loadData = async () => {
     }
   } catch (error) {
     console.error('加载数据失败:', error)
+  } finally {
+    listLoading.value = false
   }
 }
 
@@ -230,26 +244,38 @@ const handleCurrentChange = (val) => {
 }
 
 const handleStatistics = async () => {
+  if (!validateDateRange(statForm.startDate, statForm.endDate)) return
+
   try {
+    statLoading.value = true
     const params = {
-      start_date: statForm.startDate ? statForm.startDate.toISOString().split('T')[0] : '',
-      end_date: statForm.endDate ? statForm.endDate.toISOString().split('T')[0] : ''
+      start_date: formatDate(statForm.startDate),
+      end_date: formatDate(statForm.endDate)
     }
-    const res = await getAttendanceStatistics(params)
+    const res = await getAttendanceSummary(params)
     if (res.code === 0) {
-      const records = res.data.records || []
-      statData.total = records.length
-      statData.normal = records.filter(r => r.status === '正常').length
-      statData.late = records.filter(r => r.status === '迟到').length
-      statData.absent = records.filter(r => r.status === '缺勤').length
+      statData.total = res.data?.total || 0
+      statData.normal = res.data?.normal || 0
+      statData.late = res.data?.late || 0
+      statData.early = res.data?.early || 0
+      statData.absent = res.data?.absent || 0
     }
   } catch (error) {
     console.error('统计失败:', error)
+  } finally {
+    statLoading.value = false
   }
+}
+
+const handleStatReset = () => {
+  statForm.startDate = null
+  statForm.endDate = null
+  handleStatistics()
 }
 
 onMounted(() => {
   loadData()
+  handleStatistics()
 })
 </script>
 
@@ -272,8 +298,18 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-.stat-item {
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  padding: 18px 20px;
   text-align: center;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fff;
 }
 
 .stat-label {
@@ -286,5 +322,17 @@ onMounted(() => {
   font-size: 24px;
   font-weight: bold;
   color: #409EFF;
+}
+
+.stat-value.success {
+  color: #67C23A;
+}
+
+.stat-value.warning {
+  color: #E6A23C;
+}
+
+.stat-value.danger {
+  color: #F56C6C;
 }
 </style>

@@ -3,6 +3,8 @@ package com.qms.campuscard.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.qms.campuscard.entity.AttendanceRecord;
 
+import java.util.Map;
+
 public interface AttendanceRecordService {
 
     IPage<AttendanceRecord> getAttendanceRecords(Long cardId, String status, String startDate, String endDate, Integer page, Integer size);
@@ -11,6 +13,8 @@ public interface AttendanceRecordService {
                                       String attendanceType, String internshipCompany, String internshipLog, String internshipLogDate);
     
     IPage<AttendanceRecord> getAttendanceStatistics(String startDate, String endDate, Integer page, Integer size);
+
+    Map<String, Long> getAttendanceSummary(String startDate, String endDate);
     
     IPage<AttendanceRecord> getAttendanceRecordsByLocationId(Long locationId, Integer page, Integer size);
 }
