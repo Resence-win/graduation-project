@@ -15,6 +15,9 @@
         <el-form-item label="作者">
           <el-input v-model="searchForm.author" placeholder="请输入作者" clearable />
         </el-form-item>
+        <el-form-item label="馆藏地">
+          <el-input v-model="searchForm.collectionLocation" placeholder="请输入校区/图书馆/楼层" clearable />
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
             <el-option label="可借阅" :value="1" />
@@ -31,6 +34,7 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="bookName" label="书名" width="200" />
         <el-table-column prop="author" label="作者" width="120" />
+        <el-table-column prop="collectionLocation" label="所属馆藏地" min-width="180" />
         <el-table-column prop="logo" label="封面" width="100">
           <template #default="{ row }">
             <el-image
@@ -81,6 +85,9 @@
         </el-form-item>
         <el-form-item label="作者" prop="author">
           <el-input v-model="form.author" placeholder="请输入作者" />
+        </el-form-item>
+        <el-form-item label="馆藏地" prop="collectionLocation">
+          <el-input v-model="form.collectionLocation" placeholder="如：东校区图书馆三楼A区" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -139,6 +146,7 @@ const uploadFile = ref(null)
 const searchForm = reactive({
   bookName: '',
   author: '',
+  collectionLocation: '',
   status: null
 })
 
@@ -151,7 +159,8 @@ const pagination = reactive({
 const form = reactive({
   id: null,
   bookName: '',
-  author: ''
+  author: '',
+  collectionLocation: ''
 })
 
 const rules = {
@@ -160,6 +169,9 @@ const rules = {
   ],
   author: [
     { required: true, message: '请输入作者', trigger: 'blur' }
+  ],
+  collectionLocation: [
+    { required: true, message: '请输入所属馆藏地', trigger: 'blur' }
   ]
 }
 
@@ -168,7 +180,10 @@ const loadData = async () => {
     const res = await getBookList({
       page: pagination.page,
       size: pagination.size,
-      ...searchForm
+      book_name: searchForm.bookName,
+      author: searchForm.author,
+      collection_location: searchForm.collectionLocation,
+      status: searchForm.status
     })
     if (res.code === 0) {
       tableData.value = res.data.records || []
@@ -187,6 +202,7 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.bookName = ''
   searchForm.author = ''
+  searchForm.collectionLocation = ''
   searchForm.status = null
   loadData()
 }
@@ -197,7 +213,8 @@ const handleAdd = () => {
   Object.assign(form, {
     id: null,
     bookName: '',
-    author: ''
+    author: '',
+    collectionLocation: ''
   })
 }
 

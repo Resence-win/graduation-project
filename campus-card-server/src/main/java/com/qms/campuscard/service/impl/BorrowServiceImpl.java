@@ -3,6 +3,7 @@ package com.qms.campuscard.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.qms.campuscard.dto.BorrowRestrictionStatus;
 import com.qms.campuscard.entity.BorrowRecord;
 import com.qms.campuscard.entity.CampusCard;
 import com.qms.campuscard.entity.Student;
@@ -21,7 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 @Service
 public class BorrowServiceImpl implements BorrowService {
@@ -47,6 +51,8 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     @Transactional
     public boolean borrowBook(Long cardId, Long bookId) {
+        ensureCanBorrow(cardId);
+
         // 查询图书
         Book book = bookMapper.selectById(bookId);
         if (book == null || book.getIsDeleted() == 1) {
@@ -61,6 +67,7 @@ public class BorrowServiceImpl implements BorrowService {
         borrowRecord.setCardId(cardId);
         borrowRecord.setBookId(bookId);
         borrowRecord.setBorrowTime(LocalDateTime.now());
+        borrowRecord.setDueTime(LocalDateTime.now().plusDays(30));
         borrowRecord.setStatus(1);
         borrowRecord.setIsDeleted(0);
         borrowRecord.setCreateTime(LocalDateTime.now());
@@ -89,7 +96,7 @@ public class BorrowServiceImpl implements BorrowService {
         if (borrowRecord == null || borrowRecord.getIsDeleted() == 1) {
             throw new RuntimeException("借阅记录不存在");
         }
-        if (borrowRecord.getStatus() != 1) {
+        if (borrowRecord.getStatus() != 1 && borrowRecord.getStatus() != 3) {
             throw new RuntimeException("图书已经归还");
         }
 
@@ -142,12 +149,16 @@ public class BorrowServiceImpl implements BorrowService {
         
         IPage<BorrowRecord> result = borrowRecordMapper.selectPage(pageParam, queryWrapper);
         
-        // 关联查询图书信息，填充书名
+        LocalDateTime now = LocalDateTime.now();
         for (BorrowRecord record : result.getRecords()) {
             Book book = bookMapper.selectById(record.getBookId());
             if (book != null) {
                 record.setBookName(book.getBookName());
+                record.setCollectionLocation(book.getCollectionLocation());
             }
+
+            fillBorrowerInfo(record);
+            refreshRecordOverdueStatus(record, now);
         }
         
         return result;
@@ -156,6 +167,8 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     @Transactional
     public boolean submitBorrowApplication(Long cardId, Long bookId, Integer borrowDays) {
+        ensureCanBorrow(cardId);
+
         // 检查用户当前借阅数量（包括正在申请中的）
         int activeCount = getActiveBorrowCount(cardId);
         if (activeCount >= 3) {
@@ -224,6 +237,8 @@ public class BorrowServiceImpl implements BorrowService {
 
         // 如果审批通过，创建借阅记录
         if (status == 2) {
+            ensureCanBorrow(application.getCardId());
+
             // 查询图书
             Book book = bookMapper.selectById(application.getBookId());
             if (book == null || book.getIsDeleted() == 1) {
@@ -294,6 +309,7 @@ public class BorrowServiceImpl implements BorrowService {
             Book book = bookMapper.selectById(application.getBookId());
             if (book != null) {
                 application.setBookName(book.getBookName());
+                application.setCollectionLocation(book.getCollectionLocation());
             }
             
             // 查询校园卡信息
@@ -324,7 +340,7 @@ public class BorrowServiceImpl implements BorrowService {
         // 计算已批准且借阅中的图书数量
         QueryWrapper<BorrowRecord> recordQueryWrapper = new QueryWrapper<>();
         recordQueryWrapper.eq("card_id", cardId);
-        recordQueryWrapper.eq("status", 1); // 借阅中
+        recordQueryWrapper.in("status", 1, 3); // 借阅中或超期
         recordQueryWrapper.eq("is_deleted", 0);
         Long recordCount = borrowRecordMapper.selectCount(recordQueryWrapper);
         int activeCount = recordCount != null ? recordCount.intValue() : 0;
@@ -339,6 +355,134 @@ public class BorrowServiceImpl implements BorrowService {
         
         // 总活跃数量 = 已借阅数量 + 正在申请数量
         return activeCount + pendingCount;
+    }
+
+    @Override
+    public BorrowRestrictionStatus getBorrowRestrictionStatus(Long cardId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        BorrowRestrictionStatus status = new BorrowRestrictionStatus();
+        status.setRestricted(false);
+        status.setOverdueDays(0);
+        status.setRemainingRestrictedDays(0);
+        status.setMessage("当前没有逾期或禁借限制");
+
+        QueryWrapper<BorrowRecord> activeOverdueQuery = new QueryWrapper<>();
+        activeOverdueQuery.eq("card_id", cardId);
+        activeOverdueQuery.in("status", 1, 3);
+        activeOverdueQuery.eq("is_deleted", 0);
+        activeOverdueQuery.isNotNull("due_time");
+        activeOverdueQuery.lt("due_time", now);
+        List<BorrowRecord> activeOverdueRecords = borrowRecordMapper.selectList(activeOverdueQuery);
+        int maxActiveOverdueDays = 0;
+        for (BorrowRecord record : activeOverdueRecords) {
+            int overdueDays = calculateOverdueDays(record.getDueTime(), now);
+            if (overdueDays > maxActiveOverdueDays) {
+                maxActiveOverdueDays = overdueDays;
+            }
+        }
+        if (maxActiveOverdueDays > 0) {
+            status.setRestricted(true);
+            status.setOverdueDays(maxActiveOverdueDays);
+            status.setRemainingRestrictedDays(maxActiveOverdueDays);
+            status.setMessage("您有图书已逾期" + maxActiveOverdueDays + "天，请先归还后再借阅");
+            markActiveOverdueRecords(activeOverdueRecords);
+            return status;
+        }
+
+        QueryWrapper<BorrowRecord> returnedQuery = new QueryWrapper<>();
+        returnedQuery.eq("card_id", cardId);
+        returnedQuery.eq("status", 2);
+        returnedQuery.eq("is_deleted", 0);
+        returnedQuery.isNotNull("due_time");
+        returnedQuery.isNotNull("return_time");
+        returnedQuery.apply("return_time > due_time");
+        List<BorrowRecord> returnedRecords = borrowRecordMapper.selectList(returnedQuery);
+
+        int maxRemainingRestrictedDays = 0;
+        int relatedOverdueDays = 0;
+        LocalDateTime latestRestrictionEndTime = null;
+        for (BorrowRecord record : returnedRecords) {
+            int overdueDays = calculateOverdueDays(record.getDueTime(), record.getReturnTime());
+            LocalDateTime restrictionEndTime = record.getReturnTime().plusDays(overdueDays);
+            if (restrictionEndTime.isAfter(now)) {
+                int remainingDays = calculateRemainingDays(now, restrictionEndTime);
+                if (remainingDays > maxRemainingRestrictedDays) {
+                    maxRemainingRestrictedDays = remainingDays;
+                    relatedOverdueDays = overdueDays;
+                    latestRestrictionEndTime = restrictionEndTime;
+                }
+            }
+        }
+
+        if (maxRemainingRestrictedDays > 0) {
+            status.setRestricted(true);
+            status.setOverdueDays(relatedOverdueDays);
+            status.setRemainingRestrictedDays(maxRemainingRestrictedDays);
+            status.setRestrictionEndTime(latestRestrictionEndTime);
+            status.setMessage("您曾逾期" + relatedOverdueDays + "天，禁借期还剩" + maxRemainingRestrictedDays + "天");
+        }
+
+        return status;
+    }
+
+    private void ensureCanBorrow(Long cardId) {
+        BorrowRestrictionStatus restrictionStatus = getBorrowRestrictionStatus(cardId);
+        if (Boolean.TRUE.equals(restrictionStatus.getRestricted())) {
+            throw new RuntimeException(restrictionStatus.getMessage());
+        }
+    }
+
+    private int calculateOverdueDays(LocalDateTime dueTime, LocalDateTime compareTime) {
+        if (dueTime == null || compareTime == null || !compareTime.isAfter(dueTime)) {
+            return 0;
+        }
+        return (int) Math.max(1, ChronoUnit.DAYS.between(dueTime.toLocalDate(), compareTime.toLocalDate()));
+    }
+
+    private int calculateRemainingDays(LocalDateTime now, LocalDateTime restrictionEndTime) {
+        if (restrictionEndTime == null || !restrictionEndTime.isAfter(now)) {
+            return 0;
+        }
+        return (int) Math.max(1, Duration.between(now, restrictionEndTime).toDays() + 1);
+    }
+
+    private void markActiveOverdueRecords(List<BorrowRecord> records) {
+        for (BorrowRecord record : records) {
+            record.setStatus(3);
+            borrowRecordMapper.updateById(record);
+        }
+    }
+
+    private void fillBorrowerInfo(BorrowRecord record) {
+        CampusCard campusCard = campusCardMapper.selectById(record.getCardId());
+        if (campusCard == null) {
+            return;
+        }
+
+        record.setCardNo(campusCard.getCardNo());
+        if ("student".equals(campusCard.getUserType())) {
+            Student student = studentMapper.selectById(campusCard.getUserId());
+            if (student != null) {
+                record.setUserName(student.getStudentNo() + " - " + student.getName());
+            }
+        } else if ("teacher".equals(campusCard.getUserType())) {
+            Teacher teacher = teacherMapper.selectById(campusCard.getUserId());
+            if (teacher != null) {
+                record.setUserName(teacher.getTeacherNo() + " - " + teacher.getName());
+            }
+        }
+    }
+
+    private void refreshRecordOverdueStatus(BorrowRecord record, LocalDateTime now) {
+        LocalDateTime compareTime = record.getReturnTime() != null ? record.getReturnTime() : now;
+        int overdueDays = calculateOverdueDays(record.getDueTime(), compareTime);
+        record.setOverdueDays(overdueDays);
+
+        if (record.getStatus() != null && record.getStatus() == 1 && overdueDays > 0) {
+            record.setStatus(3);
+            borrowRecordMapper.updateById(record);
+        }
     }
 
 }

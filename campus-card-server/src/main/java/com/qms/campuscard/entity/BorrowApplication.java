@@ -124,6 +124,8 @@ public class BorrowApplication {
     @TableField(exist = false)
     private String bookName;
     @TableField(exist = false)
+    private String collectionLocation;
+    @TableField(exist = false)
     private String cardNo;
     @TableField(exist = false)
     private String userName;
@@ -134,6 +136,14 @@ public class BorrowApplication {
     
     public void setBookName(String bookName) {
         this.bookName = bookName;
+    }
+
+    public String getCollectionLocation() {
+        return collectionLocation;
+    }
+
+    public void setCollectionLocation(String collectionLocation) {
+        this.collectionLocation = collectionLocation;
     }
     
     public String getCardNo() {

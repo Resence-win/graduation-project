@@ -46,6 +46,7 @@
             </template>
             <el-menu-item index="/book">图书列表</el-menu-item>
             <el-menu-item index="/book/application">借阅申请</el-menu-item>
+            <el-menu-item index="/book/borrow-record">借阅记录</el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="access">
             <template #title>

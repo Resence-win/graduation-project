@@ -27,6 +27,9 @@ public class Book implements Serializable {
     @TableField("author")
     private String author;
 
+    @TableField("collection_location")
+    private String collectionLocation;
+
     @TableField("logo")
     private String logo;
 

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
 import com.qms.campuscard.dto.BorrowRequest;
+import com.qms.campuscard.dto.BorrowRestrictionStatus;
 import com.qms.campuscard.entity.Book;
 import com.qms.campuscard.entity.BorrowRecord;
 import com.qms.campuscard.entity.BorrowApplication;
@@ -33,10 +34,11 @@ public class BookController {
     public Result<IPage<Book>> getBookList(
             @RequestParam(required = false) String book_name,
             @RequestParam(required = false) String author,
+            @RequestParam(required = false) String collection_location,
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
-        IPage<Book> books = bookService.getBookList(book_name, author, status, page, size);
+        IPage<Book> books = bookService.getBookList(book_name, author, collection_location, status, page, size);
         // 记录日志
         logUtil.recordLog(1L, "查询", "book", null, "查询图书列表");
         return Result.success(books);
@@ -111,6 +113,14 @@ public class BookController {
         // 记录日志
         logUtil.recordLog(1L, "查询", "borrow_record", null, "查询活跃借阅数量，卡号：" + cardId);
         return Result.success(count);
+    }
+
+    @GetMapping("/borrow/restriction-status")
+    public Result<BorrowRestrictionStatus> getBorrowRestrictionStatus(@RequestParam("card_id") Long cardId) {
+        BorrowRestrictionStatus status = borrowService.getBorrowRestrictionStatus(cardId);
+        // 记录日志
+        logUtil.recordLog(1L, "查询", "borrow_record", null, "查询借阅限制状态，卡号：" + cardId);
+        return Result.success(status);
     }
 
     @PostMapping("/book")

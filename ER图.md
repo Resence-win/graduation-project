@@ -237,6 +237,7 @@ erDiagram
         bigserial id PK
         varchar book_name
         varchar author
+        varchar collection_location
         varchar logo
         int status
         timestamp create_time
@@ -609,6 +610,7 @@ erDiagram
         bigserial id PK
         varchar book_name
         varchar author
+        varchar collection_location
         varchar logo
         int status
         timestamp create_time

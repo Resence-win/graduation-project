@@ -50,6 +50,18 @@ public class BorrowRecord implements Serializable {
     
     @TableField(exist = false)
     private String bookName;
+
+    @TableField(exist = false)
+    private String collectionLocation;
+
+    @TableField(exist = false)
+    private String cardNo;
+
+    @TableField(exist = false)
+    private String userName;
+
+    @TableField(exist = false)
+    private Integer overdueDays;
     
     public String getBookName() {
         return bookName;
@@ -57,5 +69,37 @@ public class BorrowRecord implements Serializable {
     
     public void setBookName(String bookName) {
         this.bookName = bookName;
+    }
+
+    public String getCollectionLocation() {
+        return collectionLocation;
+    }
+
+    public void setCollectionLocation(String collectionLocation) {
+        this.collectionLocation = collectionLocation;
+    }
+
+    public String getCardNo() {
+        return cardNo;
+    }
+
+    public void setCardNo(String cardNo) {
+        this.cardNo = cardNo;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public Integer getOverdueDays() {
+        return overdueDays;
+    }
+
+    public void setOverdueDays(Integer overdueDays) {
+        this.overdueDays = overdueDays;
     }
 }

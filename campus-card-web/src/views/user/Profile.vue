@@ -95,12 +95,23 @@
         </el-tab-pane>
         
         <el-tab-pane label="图书借阅" name="book" v-if="userInfo.role === 'student'">
+          <el-alert
+            v-if="borrowRestriction.restricted"
+            :title="borrowRestriction.message"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="borrow-warning"
+          />
           <el-form :inline="true" :model="bookSearchForm" class="mb-4">
             <el-form-item label="书名">
               <el-input v-model="bookSearchForm.bookName" placeholder="请输入书名" clearable />
             </el-form-item>
             <el-form-item label="作者">
               <el-input v-model="bookSearchForm.author" placeholder="请输入作者" clearable />
+            </el-form-item>
+            <el-form-item label="馆藏地">
+              <el-input v-model="bookSearchForm.collectionLocation" placeholder="请输入校区/图书馆" clearable />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="loadBookData">查询</el-button>
@@ -112,6 +123,7 @@
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="bookName" label="书名" width="200" />
             <el-table-column prop="author" label="作者" width="120" />
+            <el-table-column prop="collectionLocation" label="所属馆藏地" min-width="180" />
             <el-table-column prop="logo" label="封面" width="100">
               <template #default="{ row }">
                 <el-image
@@ -136,7 +148,9 @@
                   <el-button size="small" type="info" disabled>申请中</el-button>
                 </template>
                 <template v-else>
-                  <el-button size="small" type="primary" @click="handleBorrow(row)" :disabled="row.status !== 1">借阅</el-button>
+                  <el-button size="small" type="primary" @click="handleBorrow(row)" :disabled="row.status !== 1 || borrowRestriction.restricted">
+                    {{ borrowRestriction.restricted ? '暂不可借' : '借阅' }}
+                  </el-button>
                 </template>
               </template>
             </el-table-column>
@@ -155,22 +169,31 @@
         </el-tab-pane>
         
         <el-tab-pane label="借阅记录" name="borrow" v-if="userInfo.role === 'student'">
+          <el-alert
+            v-if="borrowRestriction.restricted"
+            :title="borrowRestriction.message"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="borrow-warning"
+          />
           <el-table :data="borrowList" border style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="bookName" label="书名" width="200" />
+            <el-table-column prop="collectionLocation" label="所属馆藏地" min-width="180" />
             <el-table-column prop="borrowTime" label="借阅时间" width="180" />
             <el-table-column prop="dueTime" label="到期时间" width="180" />
             <el-table-column prop="returnTime" label="归还时间" width="180" />
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="row.status === 1 ? 'warning' : 'success'">
-                  {{ row.status === 1 ? '借阅中' : '已归还' }}
+                <el-tag :type="getBorrowStatusType(row.status)">
+                  {{ getBorrowStatusText(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" type="primary" @click="handleReturn(row)" :disabled="row.status !== 1">归还</el-button>
+                <el-button size="small" type="primary" @click="handleReturn(row)" :disabled="row.status !== 1 && row.status !== 3">归还</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -631,6 +654,9 @@
         width="400px"
       >
         <el-form :model="borrowForm" label-width="80px">
+          <el-form-item label="馆藏地">
+            <span>{{ currentBook?.collectionLocation || '-' }}</span>
+          </el-form-item>
           <el-form-item label="借阅天数">
             <el-select v-model="borrowForm.borrowDays" placeholder="请选择借阅天数">
               <el-option
@@ -729,7 +755,7 @@ import { getStudentByNo, updateStudent } from '@/api/student'
 import { getTeacherByNo, updateTeacher } from '@/api/teacher'
 import { getCardInfo, getCardByUserNo } from '@/api/card'
 import { getConsumeList } from '@/api/consume'
-import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, returnBook } from '@/api/book'
+import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, getBorrowRestrictionStatus, returnBook } from '@/api/book'
 import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/access'
 import { getAttendanceList, createAttendance, getActiveLocations, submitInternshipApplication, submitLeaveApplication, getMyAttendanceApplications } from '@/api/attendance'
 import { getRechargeList, recharge, rechargeByCardNo } from '@/api/recharge'
@@ -805,6 +831,13 @@ const borrowPagination = reactive({
   size: 10,
   total: 0
 })
+const borrowRestriction = reactive({
+  restricted: false,
+  overdueDays: 0,
+  remainingRestrictedDays: 0,
+  restrictionEndTime: '',
+  message: ''
+})
 
 const bookList = ref([])
 const bookPagination = reactive({
@@ -830,6 +863,27 @@ const loadBorrowApplications = async () => {
   }
 }
 
+const loadBorrowRestrictionStatus = async () => {
+  try {
+    if (!cardInfo.id) return
+
+    const res = await getBorrowRestrictionStatus({
+      card_id: cardInfo.id
+    })
+    if (res.code === 0 && res.data) {
+      Object.assign(borrowRestriction, {
+        restricted: Boolean(res.data.restricted),
+        overdueDays: res.data.overdueDays || 0,
+        remainingRestrictedDays: res.data.remainingRestrictedDays || 0,
+        restrictionEndTime: res.data.restrictionEndTime || '',
+        message: res.data.message || ''
+      })
+    }
+  } catch (error) {
+    console.error('加载借阅限制状态失败:', error)
+  }
+}
+
 // 检查图书是否有未处理的借阅申请
 const hasPendingApplication = (bookId) => {
   return borrowApplications.value.some(app => app.bookId === bookId && app.status === 1)
@@ -837,7 +891,8 @@ const hasPendingApplication = (bookId) => {
 
 const bookSearchForm = reactive({
   bookName: '',
-  author: ''
+  author: '',
+  collectionLocation: ''
 })
 
 const borrowDialogVisible = ref(false)
@@ -961,6 +1016,7 @@ const loadConsumeData = async () => {
 const loadBorrowData = async () => {
   try {
     if (cardInfo.id) {
+      await loadBorrowRestrictionStatus()
       const res = await getBorrowList({
         card_id: cardInfo.id,
         page: borrowPagination.page,
@@ -1004,9 +1060,12 @@ const handleBorrowCurrentChange = (val) => {
 
 const loadBookData = async () => {
   try {
+    await loadBorrowRestrictionStatus()
     const res = await getBookList({
       bookName: bookSearchForm.bookName,
+      book_name: bookSearchForm.bookName,
       author: bookSearchForm.author,
+      collection_location: bookSearchForm.collectionLocation,
       page: bookPagination.page,
       size: bookPagination.size
     })
@@ -1024,6 +1083,7 @@ const loadBookData = async () => {
 const resetBookSearchForm = () => {
   bookSearchForm.bookName = ''
   bookSearchForm.author = ''
+  bookSearchForm.collectionLocation = ''
   loadBookData()
 }
 
@@ -1038,6 +1098,10 @@ const handleBookCurrentChange = (val) => {
 }
 
 const handleBorrow = (book) => {
+  if (borrowRestriction.restricted) {
+    ElMessage.warning(borrowRestriction.message || '当前存在逾期或禁借限制，暂时不能借阅图书')
+    return
+  }
   currentBook.value = book
   borrowDialogVisible.value = true
 }
@@ -1046,6 +1110,13 @@ const handleSubmitBorrowApplication = async () => {
   try {
     if (!cardInfo.id || !currentBook.value) {
       ElMessage.error('请先加载校园卡信息')
+      return
+    }
+
+    await loadBorrowRestrictionStatus()
+    if (borrowRestriction.restricted) {
+      ElMessage.warning(borrowRestriction.message || '当前存在逾期或禁借限制，暂时不能借阅图书')
+      borrowDialogVisible.value = false
       return
     }
 
@@ -1096,6 +1167,7 @@ const handleReturn = async (borrowRecord) => {
     const res = await returnBook({ borrow_id: borrowRecord.id })
     if (res.code === 0) {
       ElMessage.success('图书归还成功')
+      await loadBorrowRestrictionStatus()
       loadBorrowData()
       loadBookData() // 重新加载图书列表，更新图书状态
     } else {
@@ -1303,6 +1375,24 @@ const handleAccessCurrentChange = (val) => {
 
 const getStatusType = (status) => {
   return status === '成功' ? 'success' : 'danger'
+}
+
+const getBorrowStatusType = (status) => {
+  const statusMap = {
+    1: 'warning',
+    2: 'success',
+    3: 'danger'
+  }
+  return statusMap[status] || 'info'
+}
+
+const getBorrowStatusText = (status) => {
+  const statusMap = {
+    1: '借阅中',
+    2: '已归还',
+    3: '已逾期'
+  }
+  return statusMap[status] || '未知'
 }
 
 // 卡号缓存，避免重复查询
@@ -2021,6 +2111,10 @@ onMounted(async () => {
 }
 
 .mb-4 {
+  margin-bottom: 16px;
+}
+
+.borrow-warning {
   margin-bottom: 16px;
 }
 

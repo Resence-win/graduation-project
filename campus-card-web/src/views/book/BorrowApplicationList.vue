@@ -26,6 +26,7 @@
         <el-table-column prop="cardNo" label="校园卡号" width="150" />
         <el-table-column prop="userName" label="借阅人" width="200" />
         <el-table-column prop="bookName" label="图书名称" width="200" />
+        <el-table-column prop="collectionLocation" label="所属馆藏地" min-width="180" />
         <el-table-column prop="borrowDays" label="借阅天数" width="100" />
         <el-table-column prop="applicationTime" label="申请时间" width="180" />
         <el-table-column prop="status" label="状态" width="100">

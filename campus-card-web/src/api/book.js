@@ -53,3 +53,7 @@ export const getBorrowApplications = (params) => {
 export const getActiveBorrowCount = (params) => {
   return request.get('/borrow/active-count', { params })
 }
+
+export const getBorrowRestrictionStatus = (params) => {
+  return request.get('/borrow/restriction-status', { params })
+}

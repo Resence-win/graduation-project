@@ -28,7 +28,7 @@ public class BookServiceImpl implements BookService {
     private String uploadPath;
 
     @Override
-    public IPage<Book> getBookList(String bookName, String author, Integer status, Integer page, Integer size) {
+    public IPage<Book> getBookList(String bookName, String author, String collectionLocation, Integer status, Integer page, Integer size) {
         if (page == null || page < 1) {
             page = 1;
         }
@@ -44,6 +44,9 @@ public class BookServiceImpl implements BookService {
         }
         if (author != null && !author.isEmpty()) {
             queryWrapper.like("author", author);
+        }
+        if (collectionLocation != null && !collectionLocation.isEmpty()) {
+            queryWrapper.like("collection_location", collectionLocation);
         }
         if (status != null) {
             queryWrapper.eq("status", status);

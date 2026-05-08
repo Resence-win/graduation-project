@@ -1,6 +1,7 @@
 package com.qms.campuscard.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.qms.campuscard.dto.BorrowRestrictionStatus;
 import com.qms.campuscard.entity.BorrowRecord;
 import com.qms.campuscard.entity.BorrowApplication;
 
@@ -19,4 +20,6 @@ public interface BorrowService {
     IPage<BorrowApplication> getBorrowApplications(Long cardId, Long bookId, Integer status, Integer page, Integer size);
 
     int getActiveBorrowCount(Long cardId);
+
+    BorrowRestrictionStatus getBorrowRestrictionStatus(Long cardId);
 }

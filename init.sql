@@ -345,6 +345,7 @@ CREATE TABLE book (
     id BIGSERIAL PRIMARY KEY,
     book_name VARCHAR(100),
     author VARCHAR(100),
+    collection_location VARCHAR(200),
     logo VARCHAR(255),
     status INT DEFAULT 1,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -355,6 +356,7 @@ COMMENT ON TABLE book IS '图书表';
 COMMENT ON COLUMN book.id IS '主键ID';
 COMMENT ON COLUMN book.book_name IS '书名';
 COMMENT ON COLUMN book.author IS '作者';
+COMMENT ON COLUMN book.collection_location IS '所属馆藏地';
 COMMENT ON COLUMN book.logo IS '图书封面';
 COMMENT ON COLUMN book.status IS '状态';
 COMMENT ON COLUMN book.create_time IS '创建时间';

@@ -87,6 +87,12 @@ const routes = [
         meta: { title: '借阅申请管理', requiresAdmin: true }
       },
       {
+        path: 'book/borrow-record',
+        name: 'BorrowRecord',
+        component: () => import('@/views/book/BorrowRecordList.vue'),
+        meta: { title: '借阅记录管理', requiresAdmin: true }
+      },
+      {
         path: 'access',
         name: 'Access',
         component: () => import('@/views/access/AccessRecordList.vue'),

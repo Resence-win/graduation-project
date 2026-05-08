@@ -6,7 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface BookService {
 
-    IPage<Book> getBookList(String bookName, String author, Integer status, Integer page, Integer size);
+    IPage<Book> getBookList(String bookName, String author, String collectionLocation, Integer status, Integer page, Integer size);
 
     String uploadLogo(Long bookId, MultipartFile file);
 
