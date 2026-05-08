@@ -45,6 +45,18 @@ const routes = [
         meta: { title: '商户管理', requiresAdmin: true }
       },
       {
+        path: 'product',
+        name: 'Product',
+        component: () => import('@/views/product/ProductList.vue'),
+        meta: { title: '商品管理', requiresAdmin: true }
+      },
+      {
+        path: 'product/student',
+        name: 'StudentProduct',
+        component: () => import('@/views/product/StudentProduct.vue'),
+        meta: { title: '商品消费', allowedRoles: ['student'] }
+      },
+      {
         path: 'card',
         name: 'Card',
         component: () => import('@/views/card/CardList.vue'),

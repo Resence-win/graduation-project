@@ -1,6 +1,7 @@
 package com.qms.campuscard.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.Account;
@@ -8,12 +9,14 @@ import com.qms.campuscard.entity.AccountFlow;
 import com.qms.campuscard.entity.CampusCard;
 import com.qms.campuscard.entity.ConsumeRecord;
 import com.qms.campuscard.entity.Merchant;
+import com.qms.campuscard.entity.Product;
 import com.qms.campuscard.dto.ConsumeRecordDTO;
 import com.qms.campuscard.mapper.AccountFlowMapper;
 import com.qms.campuscard.mapper.AccountMapper;
 import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.ConsumeRecordMapper;
 import com.qms.campuscard.mapper.MerchantMapper;
+import com.qms.campuscard.mapper.ProductMapper;
 import com.qms.campuscard.service.ConsumeService;
 import com.qms.campuscard.util.RedisUtil;
 import org.springframework.stereotype.Service;
@@ -46,11 +49,32 @@ public class ConsumeServiceImpl implements ConsumeService {
     private MerchantMapper merchantMapper;
 
     @Resource
+    private ProductMapper productMapper;
+
+    @Resource
     private RedisUtil redisUtil;
 
     @Override
     @Transactional
     public boolean consume(Long cardId, Long merchantId, BigDecimal amount) {
+        return consumeInternal(cardId, merchantId, null, null, 1, amount);
+    }
+
+    private boolean consumeInternal(Long cardId, Long merchantId, Long productId, String productName, Integer quantity, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("消费金额必须大于0");
+        }
+        if (merchantId == null) {
+            throw new RuntimeException("商户不能为空");
+        }
+        Merchant merchant = merchantMapper.selectById(merchantId);
+        if (merchant == null || Integer.valueOf(1).equals(merchant.getIsDeleted())) {
+            throw new RuntimeException("商户不存在");
+        }
+        if (merchant.getStatus() != null && merchant.getStatus() != 1) {
+            throw new RuntimeException("商户状态异常，无法消费");
+        }
+
         // 检查校园卡状态
         QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
         cardQuery.eq("id", cardId);
@@ -75,21 +99,33 @@ public class ConsumeServiceImpl implements ConsumeService {
             throw new RuntimeException("账户不存在");
         }
 
-        // 校验余额
-        if (account.getBalance().compareTo(amount) < 0) {
+        if (account.getStatus() != null && account.getStatus() != 1) {
+            throw new RuntimeException("账户状态异常");
+        }
+
+        BigDecimal newBalance = account.getBalance().subtract(amount);
+        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
             throw new RuntimeException("余额不足");
         }
 
-        // 扣减余额
-        BigDecimal newBalance = account.getBalance().subtract(amount);
-        account.setBalance(newBalance);
-        account.setUpdateTime(LocalDateTime.now());
-        accountMapper.updateById(account);
+        UpdateWrapper<Account> accountUpdate = new UpdateWrapper<>();
+        accountUpdate.eq("id", account.getId());
+        accountUpdate.eq("is_deleted", 0);
+        accountUpdate.ge("balance", amount);
+        accountUpdate.setSql("balance = balance - " + amount.toPlainString());
+        accountUpdate.set("update_time", LocalDateTime.now());
+        int updated = accountMapper.update(null, accountUpdate);
+        if (updated <= 0) {
+            throw new RuntimeException("余额不足");
+        }
 
         // 创建消费记录
         ConsumeRecord consumeRecord = new ConsumeRecord();
         consumeRecord.setAccountId(account.getId());
         consumeRecord.setMerchantId(merchantId);
+        consumeRecord.setProductId(productId);
+        consumeRecord.setProductName(productName);
+        consumeRecord.setQuantity(quantity == null ? 1 : quantity);
         consumeRecord.setAmount(amount);
         consumeRecord.setBalanceAfter(newBalance);
         consumeRecord.setStatus(1);
@@ -128,6 +164,54 @@ public class ConsumeServiceImpl implements ConsumeService {
         
         // 调用现有的消费方法
         return consume(campusCard.getId(), merchantId, amount);
+    }
+
+    @Override
+    @Transactional
+    public boolean consumeProductByCardNo(String cardNo, Long productId, Integer quantity) {
+        if (quantity == null || quantity < 1) {
+            throw new RuntimeException("购买数量必须大于0");
+        }
+        if (productId == null) {
+            throw new RuntimeException("商品不能为空");
+        }
+
+        QueryWrapper<Product> productQuery = new QueryWrapper<>();
+        productQuery.eq("id", productId);
+        productQuery.eq("is_deleted", 0);
+        Product product = productMapper.selectOne(productQuery);
+        if (product == null) {
+            throw new RuntimeException("商品不存在");
+        }
+        if (product.getStatus() == null || product.getStatus() != 1) {
+            throw new RuntimeException("商品已下架");
+        }
+        if (product.getStock() == null || product.getStock() < quantity) {
+            throw new RuntimeException("商品库存不足");
+        }
+
+        UpdateWrapper<Product> productUpdate = new UpdateWrapper<>();
+        productUpdate.eq("id", productId);
+        productUpdate.eq("is_deleted", 0);
+        productUpdate.eq("status", 1);
+        productUpdate.ge("stock", quantity);
+        productUpdate.setSql("stock = stock - " + quantity);
+        productUpdate.set("update_time", LocalDateTime.now());
+        int stockUpdated = productMapper.update(null, productUpdate);
+        if (stockUpdated <= 0) {
+            throw new RuntimeException("商品库存不足");
+        }
+
+        QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+        cardQuery.eq("card_no", cardNo);
+        cardQuery.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(cardQuery);
+        if (campusCard == null) {
+            throw new RuntimeException("校园卡不存在");
+        }
+
+        BigDecimal amount = product.getPrice().multiply(BigDecimal.valueOf(quantity));
+        return consumeInternal(campusCard.getId(), product.getMerchantId(), product.getId(), product.getProductName(), quantity, amount);
     }
 
     @Override
@@ -190,6 +274,9 @@ public class ConsumeServiceImpl implements ConsumeService {
             dto.setId(consumeRecord.getId());
             dto.setAccountId(consumeRecord.getAccountId());
             dto.setMerchantId(consumeRecord.getMerchantId());
+            dto.setProductId(consumeRecord.getProductId());
+            dto.setProductName(consumeRecord.getProductName());
+            dto.setQuantity(consumeRecord.getQuantity());
             dto.setAmount(consumeRecord.getAmount());
             dto.setBalanceAfter(consumeRecord.getBalanceAfter());
             dto.setStatus(consumeRecord.getStatus());

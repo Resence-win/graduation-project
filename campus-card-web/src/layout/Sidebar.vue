@@ -28,6 +28,7 @@
           <span>业务管理</span>
         </template>
         <el-menu-item index="/merchant">商户管理</el-menu-item>
+        <el-menu-item index="/product">商品管理</el-menu-item>
         <el-menu-item index="/card">校园卡管理</el-menu-item>
         <el-menu-item index="/account">账户管理</el-menu-item>
         <el-menu-item index="/recharge">充值管理</el-menu-item>
@@ -77,6 +78,10 @@
       <el-menu-item index="/commute/student">
         <el-icon><Van /></el-icon>
         <span>通勤车查询</span>
+      </el-menu-item>
+      <el-menu-item v-if="userRole === 'student'" index="/product/student">
+        <el-icon><ShoppingCart /></el-icon>
+        <span>商品消费</span>
       </el-menu-item>
       <!-- 老师菜单 -->
       <template v-if="userRole === 'teacher'">

@@ -1,53 +1,54 @@
 package com.qms.campuscard.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.TableField;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@TableName("consume_record")
+@TableName("product")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConsumeRecord implements Serializable {
+public class Product implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @TableField("account_id")
-    private Long accountId;
+    @TableField("product_name")
+    private String productName;
 
     @TableField("merchant_id")
     private Long merchantId;
 
-    @TableField("product_id")
-    private Long productId;
+    @TableField("price")
+    private BigDecimal price;
 
-    @TableField("product_name")
-    private String productName;
+    @TableField("stock")
+    private Integer stock;
 
-    @TableField("quantity")
-    private Integer quantity;
+    @TableField("description")
+    private String description;
 
-    @TableField("amount")
-    private BigDecimal amount;
-
-    @TableField("balance_after")
-    private BigDecimal balanceAfter;
+    @TableField("image")
+    private String image;
 
     @TableField("status")
     private Integer status;
 
-    @TableField("consume_time")
-    private LocalDateTime consumeTime;
+    @TableField("create_time")
+    private LocalDateTime createTime;
+
+    @TableField("update_time")
+    private LocalDateTime updateTime;
 
     @TableField("is_deleted")
     private Integer isDeleted;

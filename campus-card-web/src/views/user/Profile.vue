@@ -77,6 +77,16 @@
           <el-table :data="consumeList" border style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="merchantName" label="商户名称" width="180" />
+            <el-table-column prop="productName" label="商品" width="160">
+              <template #default="{ row }">
+                {{ row.productName || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="quantity" label="数量" width="80">
+              <template #default="{ row }">
+                {{ row.productName ? row.quantity || 1 : '-' }}
+              </template>
+            </el-table-column>
             <el-table-column prop="amount" label="消费金额" width="120" />
             <el-table-column prop="balanceAfter" label="消费后余额" width="120" />
             <el-table-column prop="consumeTime" label="消费时间" width="180" />
@@ -1031,7 +1041,7 @@ const loadConsumeData = async () => {
   try {
     if (cardInfo.id) {
       const res = await getConsumeList({
-        card_id: cardInfo.id,
+        card_id: cardInfo.cardNo,
         start_date: consumeForm.startDate ? new Date(consumeForm.startDate).toISOString().split('T')[0] : '',
         end_date: consumeForm.endDate ? new Date(consumeForm.endDate).toISOString().split('T')[0] : '',
         page: consumePagination.page,

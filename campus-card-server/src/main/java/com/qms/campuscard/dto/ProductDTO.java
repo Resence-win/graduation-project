@@ -1,24 +1,25 @@
 package com.qms.campuscard.dto;
 
 import lombok.Data;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-public class ConsumeRecordDTO implements Serializable {
+public class ProductDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long id;
-    private Long accountId;
-    private String cardNo;
+    private String productName;
     private Long merchantId;
     private String merchantName;
-    private Long productId;
-    private String productName;
-    private Integer quantity;
-    private BigDecimal amount;
-    private BigDecimal balanceAfter;
+    private BigDecimal price;
+    private Integer stock;
+    private String description;
+    private String image;
     private Integer status;
-    private LocalDateTime consumeTime;
+    private LocalDateTime createTime;
+    private LocalDateTime updateTime;
+    private Integer isDeleted;
 }

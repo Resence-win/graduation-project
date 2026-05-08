@@ -44,6 +44,13 @@ public class RechargeServiceImpl implements RechargeService {
     @Override
     @Transactional
     public boolean recharge(Long cardId, BigDecimal amount, String rechargeType, Long operatorId, String operatorName) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("充值金额必须大于0");
+        }
+        if (rechargeType == null || rechargeType.trim().isEmpty()) {
+            throw new RuntimeException("充值方式不能为空");
+        }
+
         // 检查校园卡状态
         QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
         cardQuery.eq("id", cardId);

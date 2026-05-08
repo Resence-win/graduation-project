@@ -7,6 +7,7 @@ public interface ConsumeService {
 
     boolean consume(Long cardId, Long merchantId, java.math.BigDecimal amount);
     boolean consumeByCardNo(String cardNo, Long merchantId, java.math.BigDecimal amount);
+    boolean consumeProductByCardNo(String cardNo, Long productId, Integer quantity);
 
     IPage<com.qms.campuscard.dto.ConsumeRecordDTO> getConsumeRecords(String cardId, Long merchantId, String startDate, String endDate, Integer page, Integer size);
 }

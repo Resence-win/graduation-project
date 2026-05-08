@@ -5,6 +5,7 @@ import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
 import com.qms.campuscard.dto.ConsumeRequest;
 import com.qms.campuscard.dto.ConsumeByCardNoRequest;
+import com.qms.campuscard.dto.ProductOrderRequest;
 import com.qms.campuscard.service.ConsumeService;
 import org.springframework.web.bind.annotation.*;
 
@@ -55,6 +56,22 @@ public class ConsumeController {
         } catch (Exception e) {
             // 记录日志
             logUtil.recordLog(1L, "新增", "consume_record", null, "消费失败：" + e.getMessage());
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @PostMapping("/product-order")
+    public Result<Boolean> consumeProduct(@RequestBody ProductOrderRequest request) {
+        try {
+            boolean success = consumeService.consumeProductByCardNo(request.getCardNo(), request.getProductId(), request.getQuantity());
+            if (success) {
+                logUtil.recordLog(1L, "新增", "consume_record", null, "商品消费成功，卡号：" + request.getCardNo() + "，商品：" + request.getProductId() + "，数量：" + request.getQuantity());
+                return Result.success("下单成功", true);
+            } else {
+                return Result.error("下单失败");
+            }
+        } catch (Exception e) {
+            logUtil.recordLog(1L, "新增", "consume_record", null, "商品消费失败：" + e.getMessage());
             return Result.error(e.getMessage());
         }
     }

@@ -36,6 +36,16 @@
         </el-table-column>
         <el-table-column prop="cardNo" label="账户卡号" width="180" />
         <el-table-column prop="merchantName" label="商户名称" width="180" />
+        <el-table-column prop="productName" label="商品" width="160">
+          <template #default="{ row }">
+            {{ row.productName || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="quantity" label="数量" width="80">
+          <template #default="{ row }">
+            {{ row.productName ? row.quantity || 1 : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="amount" label="消费金额" width="120">
           <template #default="{ row }">
             <span style="color: #F56C6C; font-weight: bold">-¥{{ row.amount }}</span>
