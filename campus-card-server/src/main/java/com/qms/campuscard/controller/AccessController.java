@@ -99,8 +99,11 @@ public class AccessController {
     public Result<AccessRecord> createQRAccess(
             @RequestParam Long card_id,
             @RequestParam Long access_point_id,
-            @RequestParam String qr_code) {
-        AccessRecord record = accessService.createQRAccess(card_id, access_point_id, qr_code);
+            @RequestParam String qr_code,
+            @RequestParam(required = false) Double actual_latitude,
+            @RequestParam(required = false) Double actual_longitude,
+            @RequestParam(required = false) String device_info) {
+        AccessRecord record = accessService.createQRAccess(card_id, access_point_id, qr_code, actual_latitude, actual_longitude, device_info);
         logUtil.recordLog(1L, "操作", "access_record", record.getId(), "二维码开门");
         return Result.success(record);
     }
@@ -143,12 +146,16 @@ public class AccessController {
         
         // 写入CSV内容
         PrintWriter writer = response.getWriter();
-        writer.println("ID,卡号,门禁点ID,方向,位置,状态,通行时间,设备信息");
+        writer.println("ID,卡号,门禁点ID,方向,位置,状态,实际纬度,实际经度,距离(米),通行时间,设备信息");
         for (AccessRecord record : records) {
             writer.println(record.getId() + "," + record.getCardId() + "," + 
                           (record.getAccessPointId() != null ? record.getAccessPointId() : "") + "," +
                           record.getDirection() + "," + record.getLocation() + "," + 
-                          record.getStatus() + "," + record.getAccessTime() + "," + 
+                          record.getStatus() + "," +
+                          (record.getActualLatitude() != null ? record.getActualLatitude() : "") + "," +
+                          (record.getActualLongitude() != null ? record.getActualLongitude() : "") + "," +
+                          (record.getDistance() != null ? String.format("%.1f", record.getDistance()) : "") + "," +
+                          record.getAccessTime() + "," +
                           record.getDeviceInfo());
         }
         writer.flush();

@@ -36,6 +36,15 @@ public class AccessRecord implements Serializable {
     @TableField("status")
     private String status;
 
+    @TableField("actual_latitude")
+    private Double actualLatitude;
+
+    @TableField("actual_longitude")
+    private Double actualLongitude;
+
+    @TableField("distance")
+    private Double distance;
+
     @TableField("access_time")
     private LocalDateTime accessTime;
 

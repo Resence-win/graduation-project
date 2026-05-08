@@ -28,6 +28,15 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="门禁点名称" />
         <el-table-column prop="location" label="位置" />
+        <el-table-column label="坐标" min-width="180">
+          <template #default="scope">
+            <span v-if="scope.row.latitude && scope.row.longitude">
+              {{ Number(scope.row.latitude).toFixed(6) }}, {{ Number(scope.row.longitude).toFixed(6) }}
+            </span>
+            <el-tag v-else type="warning">未配置</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="radius" label="半径(米)" width="100" />
         <el-table-column prop="deviceId" label="设备ID" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
@@ -71,6 +80,38 @@
         <el-form-item label="位置" required>
           <el-input v-model="form.location" placeholder="请输入位置" />
         </el-form-item>
+        <el-form-item label="纬度" required>
+          <el-input-number
+            v-model="form.latitude"
+            :precision="6"
+            :step="0.000001"
+            :min="-90"
+            :max="90"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="经度" required>
+          <el-input-number
+            v-model="form.longitude"
+            :precision="6"
+            :step="0.000001"
+            :min="-180"
+            :max="180"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="允许半径" required>
+          <el-input-number
+            v-model="form.radius"
+            :min="1"
+            :max="1000"
+            :step="5"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="fillCurrentLocation">使用当前位置</el-button>
+        </el-form-item>
         <el-form-item label="设备ID" required>
           <el-input v-model="form.deviceId" placeholder="请输入设备ID" />
         </el-form-item>
@@ -112,6 +153,9 @@ const form = reactive({
   id: '',
   name: '',
   location: '',
+  latitude: null,
+  longitude: null,
+  radius: 50,
   deviceId: '',
   status: 1
 })
@@ -155,6 +199,9 @@ const handleAdd = () => {
   form.id = ''
   form.name = ''
   form.location = ''
+  form.latitude = null
+  form.longitude = null
+  form.radius = 50
   form.deviceId = ''
   form.status = 1
   dialogVisible.value = true
@@ -165,6 +212,9 @@ const handleEdit = (row) => {
   form.id = row.id
   form.name = row.name
   form.location = row.location
+  form.latitude = row.latitude
+  form.longitude = row.longitude
+  form.radius = row.radius || 50
   form.deviceId = row.deviceId
   form.status = row.status
   dialogVisible.value = true
@@ -186,7 +236,7 @@ const handleDelete = (id) => {
 }
 
 const handleSubmit = () => {
-  if (!form.name || !form.location || !form.deviceId) {
+  if (!form.name || !form.location || !form.deviceId || form.latitude === null || form.longitude === null || !form.radius) {
     ElMessage.warning('请填写完整信息')
     return
   }
@@ -206,6 +256,29 @@ const handleSubmit = () => {
       loadData()
     })
   }
+}
+
+const fillCurrentLocation = () => {
+  if (!navigator.geolocation) {
+    ElMessage.error('当前浏览器不支持定位')
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      form.latitude = Number(position.coords.latitude.toFixed(6))
+      form.longitude = Number(position.coords.longitude.toFixed(6))
+      ElMessage.success('已填入当前位置坐标')
+    },
+    () => {
+      ElMessage.error('获取当前位置失败，请检查浏览器定位权限')
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 30000
+    }
+  )
 }
 
 onMounted(() => {

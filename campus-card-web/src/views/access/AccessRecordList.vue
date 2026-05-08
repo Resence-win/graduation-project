@@ -59,6 +59,11 @@
         </el-table-column>
         <el-table-column prop="direction" label="方向" width="80" />
         <el-table-column prop="location" label="位置" />
+        <el-table-column label="定位距离" width="120">
+          <template #default="scope">
+            {{ scope.row.distance !== null && scope.row.distance !== undefined ? Number(scope.row.distance).toFixed(1) + '米' : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
               <template #default="scope">
                 <el-tag :type="getStatusType(scope.row.status)">

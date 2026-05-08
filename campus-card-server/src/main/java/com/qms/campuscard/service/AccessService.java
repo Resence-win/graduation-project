@@ -19,7 +19,7 @@ public interface AccessService {
     // 门禁记录管理
     IPage<AccessRecord> getAccessRecords(Long cardId, Long accessPointId, LocalDateTime startDate, LocalDateTime endDate, String status, Integer page, Integer size);
     IPage<AccessRecord> getMyAccessRecords(Long cardId, Integer page, Integer size);
-    AccessRecord createQRAccess(Long cardId, Long accessPointId, String qrCode);
+    AccessRecord createQRAccess(Long cardId, Long accessPointId, String qrCode, Double actualLatitude, Double actualLongitude, String deviceInfo);
     List<Map<String, Object>> getAccessStatistics(LocalDateTime startDate, LocalDateTime endDate);
     List<AccessRecord> exportAccessRecords(Long cardId, LocalDateTime startDate, LocalDateTime endDate);
 }

@@ -233,6 +233,11 @@
             </el-table-column>
             <el-table-column prop="direction" label="方向" width="80" />
             <el-table-column prop="location" label="位置" />
+            <el-table-column label="定位距离" width="120">
+              <template #default="scope">
+                {{ scope.row.distance !== null && scope.row.distance !== undefined ? Number(scope.row.distance).toFixed(1) + '米' : '-' }}
+              </template>
+            </el-table-column>
             <el-table-column prop="status" label="状态" width="100">
               <template #default="scope">
                 <el-tag :type="getStatusType(scope.row.status)">
@@ -615,6 +620,15 @@
               </el-icon>
               <span class="direction-text">本次扫码将{{ nextDirection === '进' ? '进入' : '离开' }}该门禁点</span>
             </div>
+            <div class="access-location-info" v-if="accessLocationText">
+              <el-icon><Position /></el-icon>
+              <span>{{ accessLocationText }}</span>
+              <span v-if="selectedAccessPointDistance !== null">，距门禁约 {{ selectedAccessPointDistance.toFixed(1) }} 米</span>
+            </div>
+            <div class="access-location-error" v-else-if="accessLocationError">
+              <el-icon><Warning /></el-icon>
+              <span>{{ accessLocationError }}</span>
+            </div>
             <div class="qr-code" v-if="qrCodeUrl">
               <img :src="qrCodeUrl" alt="二维码" />
               <p class="qr-tip">请将二维码对准门禁设备扫描</p>
@@ -641,7 +655,7 @@
           <template #footer>
             <span class="dialog-footer">
               <el-button @click="showQRCodeDialog = false">关闭</el-button>
-              <el-button type="primary" @click="refreshQRCode" :disabled="!qrForm.access_point_id">刷新二维码</el-button>
+              <el-button type="primary" @click="refreshQRCode" :disabled="!qrForm.access_point_id" :loading="accessLocating">定位并刷新二维码</el-button>
             </span>
           </template>
         </el-dialog>
@@ -929,6 +943,26 @@ const qrForm = reactive({
 })
 const qrCodeUrl = ref('')
 const accessPoints = ref([])
+const accessLatitude = ref(null)
+const accessLongitude = ref(null)
+const accessLocationText = ref('')
+const accessLocationError = ref('')
+const accessLocating = ref(false)
+
+const selectedAccessPointForQR = computed(() => {
+  return accessPoints.value.find(point => point.id === qrForm.access_point_id) || null
+})
+
+const selectedAccessPointDistance = computed(() => {
+  const point = selectedAccessPointForQR.value
+  if (!point || accessLatitude.value === null || accessLongitude.value === null) {
+    return null
+  }
+  if (point.latitude === null || point.latitude === undefined || point.longitude === null || point.longitude === undefined) {
+    return null
+  }
+  return calculateDistance(accessLatitude.value, accessLongitude.value, point.latitude, point.longitude)
+})
 
 // 计算下次扫码的方向
 const nextDirection = computed(() => {
@@ -1250,9 +1284,29 @@ const loadAccessPoints = async () => {
 const qrCodeStatus = ref('waiting') // waiting, scanning, success, failed
 const qrCodePolling = ref(null)
 
-const generateQRCode = () => {
+const generateQRCode = async () => {
   if (!qrForm.access_point_id) {
     ElMessage.warning('请选择门禁点')
+    return
+  }
+
+  if (!cardInfo.id) {
+    ElMessage.error('请先加载校园卡信息')
+    return
+  }
+
+  accessLocating.value = true
+  accessLocationError.value = ''
+  try {
+    const position = await getBrowserLocation()
+    accessLatitude.value = position.coords.latitude
+    accessLongitude.value = position.coords.longitude
+    accessLocationText.value = `当前位置: 纬度 ${accessLatitude.value.toFixed(6)}, 经度 ${accessLongitude.value.toFixed(6)}`
+  } catch (error) {
+    accessLocationText.value = ''
+    accessLocationError.value = error.message || '获取位置失败，请检查浏览器定位权限'
+    ElMessage.error(accessLocationError.value)
+    accessLocating.value = false
     return
   }
   
@@ -1282,66 +1336,50 @@ const generateQRCode = () => {
     }
   }, 60000)
   
-  // 开始轮询，检查二维码是否被扫描
   startQRCodePolling(qrCode)
+  accessLocating.value = false
 }
 
 const startQRCodePolling = (qrCode) => {
-  // 清除之前的轮询
   if (qrCodePolling.value) {
-    clearInterval(qrCodePolling.value)
+    clearTimeout(qrCodePolling.value)
   }
-  
-  // 每1秒轮询一次
-  qrCodePolling.value = setInterval(async () => {
+
+  qrCodePolling.value = setTimeout(async () => {
     try {
-      // 这里应该调用后端的扫码状态检查接口
-      // 由于后端没有这个接口，我们模拟一个随机的扫描结果
-      const random = Math.random()
-      if (random > 0.7) {
-        // 模拟扫码成功
+      const response = await createQRAccess({
+        card_id: cardInfo.id,
+        access_point_id: qrForm.access_point_id,
+        qr_code: qrCode,
+        actual_latitude: accessLatitude.value,
+        actual_longitude: accessLongitude.value,
+        device_info: navigator.userAgent
+      })
+
+      if (response.code === 0) {
         qrCodeStatus.value = 'success'
-        clearInterval(qrCodePolling.value)
         qrCodePolling.value = null
-        
-        // 调用后端接口，记录门禁记录
-        try {
-          const response = await createQRAccess({
-            card_id: cardInfo.id,
-            access_point_id: qrForm.access_point_id,
-            qr_code: qrCode
-          })
-          
-          if (response.code === 0) {
-            // 显示成功消息
-            ElMessage.success(`开门成功！您已${nextDirection.value === '进' ? '进入' : '离开'}该门禁点`)
-            
-            // 重新加载门禁记录
-            loadAccessData()
-          } else {
-            ElMessage.error('开门失败：' + response.message)
-          }
-        } catch (error) {
-          console.error('调用开门接口失败:', error)
-          ElMessage.error('开门失败，请稍后重试')
-        }
-        
-        // 3秒后关闭对话框
+        ElMessage.success(`开门成功！您已${nextDirection.value === '进' ? '进入' : '离开'}该门禁点，距离约 ${Number(response.data.distance || 0).toFixed(1)} 米`)
+        loadAccessData()
+
         setTimeout(() => {
           showQRCodeDialog.value = false
           qrCodeUrl.value = ''
         }, 3000)
       }
     } catch (error) {
-      console.error('检查扫码状态失败:', error)
+      qrCodeStatus.value = 'failed'
+      qrCodePolling.value = null
+      ElMessage.error(error.message || '开门失败，请确认是否在门禁附近')
+      console.error('扫码开门失败:', error)
     }
-  }, 1000)
+  }, 800)
 }
 
 // 关闭对话框时清除轮询
 watch(showQRCodeDialog, (newVal) => {
   if (!newVal && qrCodePolling.value) {
-    clearInterval(qrCodePolling.value)
+    clearTimeout(qrCodePolling.value)
     qrCodePolling.value = null
     qrCodeUrl.value = ''
     qrCodeStatus.value = 'waiting'
@@ -1355,6 +1393,8 @@ const refreshQRCode = () => {
 const handleAccessPointChange = () => {
   // 门禁点改变时，清空二维码，让用户重新生成
   qrCodeUrl.value = ''
+  accessLocationText.value = ''
+  accessLocationError.value = ''
 }
 
 const resetAccessForm = () => {
@@ -1523,6 +1563,21 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return R * c;
 }
 
+const getBrowserLocation = () => {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('当前浏览器不支持定位'))
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 30000
+    })
+  })
+}
+
 // 检查是否在打卡范围内
 const isInCheckinArea = () => {
   if (!currentLatitude.value || !currentLongitude.value || !selectedLocation.value) {
@@ -1541,25 +1596,19 @@ const isInCheckinArea = () => {
 
 // 获取当前位置
 const getCurrentLocation = () => {
-  if (navigator.geolocation) {
-    locationError.value = ''
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        currentLatitude.value = position.coords.latitude
-        currentLongitude.value = position.coords.longitude
-        // 这里可以调用逆地理编码API获取具体位置名称
-        currentLocation.value = `纬度: ${currentLatitude.value.toFixed(4)}, 经度: ${currentLongitude.value.toFixed(4)}`
-      },
-      (error) => {
-        locationError.value = '获取位置失败，请检查位置权限设置'
-        currentLocation.value = ''
-        currentLatitude.value = null
-        currentLongitude.value = null
-      }
-    )
-  } else {
-    locationError.value = '您的浏览器不支持地理定位'
-  }
+  locationError.value = ''
+  getBrowserLocation()
+    .then((position) => {
+      currentLatitude.value = position.coords.latitude
+      currentLongitude.value = position.coords.longitude
+      currentLocation.value = `纬度: ${currentLatitude.value.toFixed(4)}, 经度: ${currentLongitude.value.toFixed(4)}`
+    })
+    .catch((error) => {
+      locationError.value = error.message || '获取位置失败，请检查位置权限设置'
+      currentLocation.value = ''
+      currentLatitude.value = null
+      currentLongitude.value = null
+    })
 }
 
 // 处理打卡
@@ -2078,6 +2127,10 @@ watch(() => showQRCodeDialog.value, (newVal) => {
   if (newVal) {
     qrCodeUrl.value = ''
     qrForm.access_point_id = ''
+    accessLatitude.value = null
+    accessLongitude.value = null
+    accessLocationText.value = ''
+    accessLocationError.value = ''
     loadAccessPoints()
   }
 })
@@ -2174,6 +2227,24 @@ onMounted(async () => {
 
 .direction-text {
   margin-left: 8px;
+}
+
+.access-location-info,
+.access-location-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.access-location-info {
+  color: #409eff;
+}
+
+.access-location-error {
+  color: #f56c6c;
 }
 
 .qr-direction {

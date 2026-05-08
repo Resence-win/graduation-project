@@ -61,7 +61,7 @@
           </el-table-column>
           <el-table-column label="操作" width="200">
             <template #default="{ row }">
-              <el-button size="small" @click="handleViewStations(row.id)">查看站点</el-button>
+              <el-button size="small" @click="handleViewStations(row)">查看站点</el-button>
               <el-button size="small" @click="handleViewSchedule(row.id)">查看时刻表</el-button>
             </template>
           </el-table-column>
@@ -96,7 +96,7 @@
               <el-form-item label="选择线路">
                 <el-select v-model="scanForm.routeId" placeholder="请选择线路" style="width: 100%">
                   <el-option
-                    v-for="route in routeList"
+                    v-for="route in activeRouteList"
                     :key="route.id"
                     :label="route.routeName"
                     :value="route.id"
@@ -187,11 +187,41 @@
         />
       </div>
     </el-card>
+
+    <el-dialog
+      v-model="stationDialogVisible"
+      :title="`${selectedStationRouteName || '线路'} - 站点`"
+      width="640px"
+    >
+      <el-table :data="selectedRouteStations" border style="width: 100%">
+        <el-table-column prop="type" label="站点类型" width="100" />
+        <el-table-column prop="stationName" label="站点名称" width="140" />
+        <el-table-column prop="location" label="站点位置" min-width="160" />
+        <el-table-column label="经纬度" width="180">
+          <template #default="{ row }">
+            <span v-if="row.latitude && row.longitude">
+              {{ Number(row.latitude).toFixed(6) }}, {{ Number(row.longitude).toFixed(6) }}
+            </span>
+            <span v-else>--</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="步行距离" width="110">
+          <template #default="{ row }">
+            {{ formatStationDistance(row) }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="stationDialogVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   getRouteList,
@@ -211,12 +241,16 @@ const selectedRouteName = ref('')
 
 // 时刻表列表
 const scheduleList = ref([])
+const allScheduleList = ref([])
 
 // 车辆列表
 const vehicleList = ref([])
 
 // 站点列表
 const stationList = ref([])
+
+const activeRouteList = computed(() => routeList.value.filter(route => route.status === 1))
+const activeVehicleList = computed(() => vehicleList.value.filter(vehicle => vehicle.status === 1))
 
 // 我的乘车记录
 const myRecordList = ref([])
@@ -248,10 +282,10 @@ watch(() => scanForm.routeId, async (newRouteId) => {
     await loadScheduleList(newRouteId)
     
     // 从时刻表中提取该线路对应的车辆ID
-    const vehicleIds = [...new Set(scheduleList.value.map(s => s.vehicleId))]
+    const vehicleIds = [...new Set(scheduleList.value.filter(s => s.status === 1).map(s => s.vehicleId))]
     
     // 过滤车辆列表，只显示该线路对应的车辆
-    filteredVehicleList.value = vehicleList.value.filter(v => vehicleIds.includes(v.id))
+    filteredVehicleList.value = activeVehicleList.value.filter(v => vehicleIds.includes(v.id))
     
     // 重置车辆和班次选择
     scanForm.vehicleId = null
@@ -259,7 +293,7 @@ watch(() => scanForm.routeId, async (newRouteId) => {
     filteredScheduleList.value = []
   } else {
     // 如果没有选择线路，显示所有车辆
-    filteredVehicleList.value = vehicleList.value
+    filteredVehicleList.value = activeVehicleList.value
     scheduleList.value = []
     filteredScheduleList.value = []
     scanForm.vehicleId = null
@@ -271,7 +305,7 @@ watch(() => scanForm.routeId, async (newRouteId) => {
 watch(() => scanForm.vehicleId, (newVehicleId) => {
   if (newVehicleId && scanForm.routeId) {
     // 过滤班次列表，只显示当前线路和车辆对应的班次
-    filteredScheduleList.value = scheduleList.value.filter(s => s.vehicleId === newVehicleId)
+    filteredScheduleList.value = scheduleList.value.filter(s => s.vehicleId === newVehicleId && s.status === 1)
     // 重置班次选择
     scanForm.scheduleId = null
   } else {
@@ -283,15 +317,16 @@ watch(() => scanForm.vehicleId, (newVehicleId) => {
 // 当前位置
 const currentLocation = ref(null)
 
+const stationDialogVisible = ref(false)
+const selectedRouteStations = ref([])
+const selectedStationRouteName = ref('')
+
 // 加载线路列表
 const loadRouteList = async () => {
   try {
-    console.log('开始加载线路列表...')
     const res = await getRouteList({ page: 1, size: 100 })
-    console.log('线路列表响应:', res)
     if (res.code === 0) {
       routeList.value = res.data.records || []
-      console.log('线路列表数据:', routeList.value)
     } else {
       console.error('线路列表响应错误:', res)
     }
@@ -312,7 +347,7 @@ const loadVehicleList = async () => {
     if (res.code === 0) {
       vehicleList.value = res.data.records || []
       // 更新过滤后的车辆列表
-      filteredVehicleList.value = vehicleList.value
+      filteredVehicleList.value = activeVehicleList.value
     }
   } catch (error) {
     console.error('加载车辆列表失败:', error)
@@ -334,7 +369,30 @@ const loadStationList = async () => {
 
 
 // 查看站点
-const handleViewStations = async (routeId) => {
+const handleViewStations = async (routeOrId) => {
+  const route = typeof routeOrId === 'object'
+    ? routeOrId
+    : routeList.value.find(r => r.id === routeOrId)
+  if (!route) {
+    ElMessage.warning('未找到线路信息')
+    return
+  }
+
+  selectedStationRouteName.value = route.routeName
+  selectedRouteStations.value = buildRouteStations(route)
+  stationDialogVisible.value = true
+
+  if (selectedRouteStations.value.length === 0) {
+    ElMessage.warning('该线路暂无可展示的站点信息')
+  }
+
+  // 自动获取当前位置（如果还没有获取）
+  if (!currentLocation.value) {
+    getCurrentLocation()
+  }
+}
+
+const handleSelectRoute = async (routeId) => {
   selectedRouteId.value = routeId
   const route = routeList.value.find(r => r.id === routeId)
   if (route) {
@@ -350,6 +408,32 @@ const handleViewStations = async (routeId) => {
   loadScheduleList(routeId)
 }
 
+const buildRouteStations = (route) => {
+  const startStation = stationList.value.find(s => s.stationName === route.startStation)
+  const endStation = stationList.value.find(s => s.stationName === route.endStation)
+  const stations = []
+
+  stations.push({
+    type: '起点',
+    stationName: route.startStation || '--',
+    location: startStation?.location || '--',
+    latitude: startStation?.latitude,
+    longitude: startStation?.longitude
+  })
+
+  if (route.endStation !== route.startStation) {
+    stations.push({
+      type: '终点',
+      stationName: route.endStation || '--',
+      location: endStation?.location || '--',
+      latitude: endStation?.latitude,
+      longitude: endStation?.longitude
+    })
+  }
+
+  return stations.filter(station => station.stationName && station.stationName !== '--')
+}
+
 // 加载时刻表
 const loadScheduleList = async (routeId) => {
   try {
@@ -357,24 +441,51 @@ const loadScheduleList = async (routeId) => {
     if (res.code === 0) {
       // 只存储当前线路的时刻表数据
       scheduleList.value = res.data.records || []
+      mergeScheduleCache(scheduleList.value)
     }
   } catch (error) {
     console.error('加载时刻表失败:', error)
   }
 }
 
+const loadAllSchedules = async () => {
+  try {
+    const res = await getScheduleList({ page: 1, size: 1000 })
+    if (res.code === 0) {
+      allScheduleList.value = res.data.records || []
+    }
+  } catch (error) {
+    console.error('加载全部时刻表失败:', error)
+  }
+}
+
+const mergeScheduleCache = (schedules) => {
+  if (!Array.isArray(schedules) || schedules.length === 0) {
+    return
+  }
+
+  const scheduleMap = new Map(allScheduleList.value.map(schedule => [schedule.id, schedule]))
+  schedules.forEach(schedule => {
+    scheduleMap.set(schedule.id, schedule)
+  })
+  allScheduleList.value = Array.from(scheduleMap.values())
+}
+
 // 查看时刻表
 const handleViewSchedule = (routeId) => {
-  handleViewStations(routeId)
+  handleSelectRoute(routeId)
 }
 
 // 加载我的乘车记录
 const loadMyRecordData = async () => {
   try {
     // 从登录信息中获取当前用户的卡ID
-    const userStr = localStorage.getItem('user')
-    const user = userStr ? JSON.parse(userStr) : null
-    const cardId = user ? user.cardId : 1
+    const cardId = getStudentCardId()
+    if (!cardId) {
+      myRecordList.value = []
+      recordPagination.total = 0
+      return
+    }
     
     // 先加载车辆和线路列表，确保数据就绪
     if (vehicleList.value.length === 0) {
@@ -384,11 +495,9 @@ const loadMyRecordData = async () => {
       await loadRouteList()
     }
     
-    // 加载所有线路的时刻表，确保能找到所有班次信息
-    if (routeList.value.length > 0) {
-      for (const route of routeList.value) {
-        await loadScheduleList(route.id)
-      }
+    // 加载全量班次索引，避免覆盖当前线路时刻表导致记录中的班次显示不全
+    if (allScheduleList.value.length === 0) {
+      await loadAllSchedules()
     }
     
     // 获取乘车记录
@@ -401,11 +510,6 @@ const loadMyRecordData = async () => {
     if (res.code === 0) {
       myRecordList.value = res.data.records || []
       recordPagination.total = res.data.total || 0
-      
-      // 打印调试信息
-      console.log('乘车记录数据:', myRecordList.value)
-      console.log('车辆列表数据:', vehicleList.value)
-      console.log('班次列表数据:', scheduleList.value)
     }
   } catch (error) {
     console.error('加载乘车记录失败:', error)
@@ -471,6 +575,20 @@ const calculateArrivalTime = (currentLocation, stationLocation) => {
   return Math.round(estimatedTime) + ' 分钟'
 }
 
+const formatStationDistance = (station) => {
+  if (!currentLocation.value || !station.latitude || !station.longitude) {
+    return '--'
+  }
+  const distance = calculateDistance(currentLocation.value, {
+    latitude: station.latitude,
+    longitude: station.longitude
+  })
+  return `${distance.toFixed(2)} km / ${calculateArrivalTime(currentLocation.value, {
+    latitude: station.latitude,
+    longitude: station.longitude
+  })}`
+}
+
 // 获取车辆信息
 const getVehicleInfo = (vehicleId) => {
   if (!vehicleId) return ''
@@ -488,7 +606,8 @@ const getRouteInfo = (routeId) => {
 // 获取班次信息
 const getScheduleInfo = (scheduleId) => {
   if (!scheduleId) return ''
-  const schedule = scheduleList.value.find(s => s.id === parseInt(scheduleId))
+  const parsedId = parseInt(scheduleId)
+  const schedule = allScheduleList.value.find(s => s.id === parsedId) || scheduleList.value.find(s => s.id === parsedId)
   return schedule ? schedule.departureTime : scheduleId
 }
 
@@ -554,11 +673,10 @@ const getStudentCardId = () => {
       return user.cardId
     }
     
-    // 如果获取失败，返回默认值1
-    return 1
+    return null
   } catch (error) {
     console.error('获取卡ID失败:', error)
-    return 1
+    return null
   }
 }
 
@@ -579,14 +697,16 @@ const handleScanQRCode = async () => {
       return
     }
     
-    // 模拟扫码过程
-    // 实际应用中，这里应该调用扫码API或打开摄像头扫码
-    
-    // 生成随机座位号
-    const seatNumber = Math.floor(Math.random() * 30) + 1
+    const vehicle = vehicleList.value.find(v => v.id === scanForm.vehicleId)
+    const seatCount = vehicle?.seatCount || 30
+    const seatNumber = Math.floor(Math.random() * seatCount) + 1
     
     // 获取学生的卡ID
     const cardId = getStudentCardId()
+    if (!cardId) {
+      ElMessage.error('未获取到校园卡信息，请重新登录或先完成开卡')
+      return
+    }
     
     // 调用后端接口记录乘车记录
     const recordData = {
@@ -601,7 +721,6 @@ const handleScanQRCode = async () => {
     
     if (res.code === 0) {
       // 显示扫码结果
-      const vehicle = vehicleList.value.find(v => v.id === scanForm.vehicleId)
       const route = routeList.value.find(r => r.id === scanForm.routeId)
       const schedule = scheduleList.value.find(s => s.id === scanForm.scheduleId)
       scanResult.value = {
@@ -618,6 +737,7 @@ const handleScanQRCode = async () => {
       if (scanForm.routeId) {
         await loadScheduleList(scanForm.routeId)
       }
+      await loadAllSchedules()
       
       // 重新加载乘车记录
       await loadMyRecordData()
@@ -629,28 +749,31 @@ const handleScanQRCode = async () => {
     } else {
       scanResult.value = {
         success: false,
-        message: '扫码失败，请重试'
+        message: res.msg || '扫码失败，请重试'
       }
     }
   } catch (error) {
     console.error('扫码失败:', error)
     scanResult.value = {
       success: false,
-      message: '扫码失败，请检查网络连接'
+      message: error.message || '扫码失败，请检查网络连接'
     }
   }
 }
 
-onMounted(() => {
-  loadRouteList()
-  loadVehicleList()
-  loadStationList()
-  loadMyRecordData()
+onMounted(async () => {
+  await Promise.all([
+    loadRouteList(),
+    loadVehicleList(),
+    loadStationList(),
+    loadAllSchedules()
+  ])
+  await loadMyRecordData()
   // 自动获取当前位置
   getCurrentLocation()
   
   // 初始化过滤后的车辆列表
-  filteredVehicleList.value = vehicleList.value
+  filteredVehicleList.value = activeVehicleList.value
 })
 </script>
 

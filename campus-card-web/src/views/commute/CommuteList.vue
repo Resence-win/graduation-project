@@ -447,7 +447,12 @@
           </el-select>
         </el-form-item>
         <el-form-item label="发车时间" required>
-          <el-time-picker v-model="scheduleForm.departureTime" placeholder="请选择发车时间" />
+          <el-time-picker
+            v-model="scheduleForm.departureTime"
+            value-format="HH:mm:ss"
+            format="HH:mm:ss"
+            placeholder="请选择发车时间"
+          />
         </el-form-item>
         <el-form-item label="班次频率">
           <el-select v-model="scheduleForm.frequency" placeholder="请选择班次频率">
@@ -460,10 +465,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="开始日期">
-          <el-date-picker v-model="scheduleForm.startDate" type="date" placeholder="请选择开始日期" />
+          <el-date-picker v-model="scheduleForm.startDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择开始日期" />
         </el-form-item>
         <el-form-item label="结束日期">
-          <el-date-picker v-model="scheduleForm.endDate" type="date" placeholder="请选择结束日期" />
+          <el-date-picker v-model="scheduleForm.endDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择结束日期" />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="scheduleForm.status" placeholder="请选择状态">
@@ -1103,7 +1108,12 @@ const handleEditSchedule = async (row) => {
     loadRouteOptions(),
     loadVehicleOptions()
   ])
-  Object.assign(scheduleForm, row)
+  Object.assign(scheduleForm, {
+    ...row,
+    departureTime: formatTimeValue(row.departureTime),
+    startDate: formatDateValue(row.startDate),
+    endDate: formatDateValue(row.endDate)
+  })
   scheduleDialogVisible.value = true
 }
 
@@ -1113,11 +1123,9 @@ const handleSaveSchedule = async () => {
     const formData = {
       ...scheduleForm
     }
-    // 处理发车时间，只保留时间部分
-    if (formData.departureTime) {
-      const time = new Date(formData.departureTime)
-      formData.departureTime = time.toTimeString().substring(0, 8)
-    }
+    formData.departureTime = formatTimeValue(formData.departureTime)
+    formData.startDate = formatDateValue(formData.startDate)
+    formData.endDate = formatDateValue(formData.endDate)
     
     let res
     if (formData.id) {
@@ -1132,6 +1140,39 @@ const handleSaveSchedule = async () => {
   } catch (error) {
     console.error('保存时刻表失败:', error)
   }
+}
+
+const formatTimeValue = (value) => {
+  if (!value) {
+    return null
+  }
+  if (typeof value === 'string') {
+    const matched = value.match(/^(\d{2}):(\d{2})(?::(\d{2}))?/)
+    return matched ? `${matched[1]}:${matched[2]}:${matched[3] || '00'}` : value
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const hours = String(value.getHours()).padStart(2, '0')
+    const minutes = String(value.getMinutes()).padStart(2, '0')
+    const seconds = String(value.getSeconds()).padStart(2, '0')
+    return `${hours}:${minutes}:${seconds}`
+  }
+  return value
+}
+
+const formatDateValue = (value) => {
+  if (!value) {
+    return null
+  }
+  if (typeof value === 'string') {
+    return value.substring(0, 10)
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear()
+    const month = String(value.getMonth() + 1).padStart(2, '0')
+    const day = String(value.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  return value
 }
 
 const handleDeleteSchedule = async (id) => {

@@ -66,13 +66,19 @@ public class CommuteVehicleServiceImpl implements CommuteVehicleService {
 
     @Override
     public CommuteVehicle getVehicleById(Long id) {
+        if (id == null) {
+            return null;
+        }
         String cacheKey = VEHICLE_INFO_KEY_PREFIX + id;
         CommuteVehicle cachedVehicle = (CommuteVehicle) redisUtil.get(cacheKey);
         if (cachedVehicle != null) {
             return cachedVehicle;
         }
 
-        CommuteVehicle vehicle = commuteVehicleMapper.selectById(id);
+        QueryWrapper<CommuteVehicle> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id);
+        queryWrapper.eq("is_deleted", 0);
+        CommuteVehicle vehicle = commuteVehicleMapper.selectOne(queryWrapper);
         if (vehicle != null) {
             redisUtil.set(cacheKey, vehicle, CACHE_EXPIRE_TIME);
         }

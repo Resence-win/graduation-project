@@ -293,6 +293,9 @@ CREATE TABLE access_point (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100),
     location VARCHAR(200),
+    latitude DECIMAL(10, 6),
+    longitude DECIMAL(10, 6),
+    radius INT DEFAULT 50,
     device_id VARCHAR(50),
     status INT DEFAULT 1,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -304,6 +307,9 @@ COMMENT ON TABLE access_point IS '门禁点表';
 COMMENT ON COLUMN access_point.id IS '主键ID';
 COMMENT ON COLUMN access_point.name IS '门禁点名称';
 COMMENT ON COLUMN access_point.location IS '位置';
+COMMENT ON COLUMN access_point.latitude IS '纬度';
+COMMENT ON COLUMN access_point.longitude IS '经度';
+COMMENT ON COLUMN access_point.radius IS '允许通行半径(米)';
 COMMENT ON COLUMN access_point.device_id IS '设备ID';
 COMMENT ON COLUMN access_point.status IS '状态(1正常)';
 COMMENT ON COLUMN access_point.create_time IS '创建时间';
@@ -321,6 +327,9 @@ CREATE TABLE access_record (
     direction VARCHAR(10),
     location VARCHAR(100),
     status VARCHAR(20),
+    actual_latitude DECIMAL(10, 6),
+    actual_longitude DECIMAL(10, 6),
+    distance DECIMAL(10, 2),
     access_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     device_info VARCHAR(255),
     is_deleted INT DEFAULT 0
@@ -333,6 +342,9 @@ COMMENT ON COLUMN access_record.access_point_id IS '门禁点ID';
 COMMENT ON COLUMN access_record.direction IS '进出方向';
 COMMENT ON COLUMN access_record.location IS '位置';
 COMMENT ON COLUMN access_record.status IS '状态(成功/失败/无效卡等)';
+COMMENT ON COLUMN access_record.actual_latitude IS '扫码实际纬度';
+COMMENT ON COLUMN access_record.actual_longitude IS '扫码实际经度';
+COMMENT ON COLUMN access_record.distance IS '扫码位置距门禁点距离(米)';
 COMMENT ON COLUMN access_record.access_time IS '通行时间';
 COMMENT ON COLUMN access_record.device_info IS '设备信息';
 COMMENT ON COLUMN access_record.is_deleted IS '是否删除(0否1是)';

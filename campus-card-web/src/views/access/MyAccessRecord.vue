@@ -13,6 +13,11 @@
         <el-table-column prop="accessPointId" label="门禁点ID" />
         <el-table-column prop="direction" label="方向" width="80" />
         <el-table-column prop="location" label="位置" />
+        <el-table-column label="定位距离" width="120">
+          <template #default="scope">
+            {{ scope.row.distance !== null && scope.row.distance !== undefined ? Number(scope.row.distance).toFixed(1) + '米' : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
             <el-tag :type="scope.row.status === '成功' ? 'success' : 'danger'">
@@ -46,7 +51,7 @@
       <div class="qr-code-container">
         <el-form :model="qrForm" label-width="100px">
           <el-form-item label="门禁点" required>
-            <el-select v-model="qrForm.access_point_id" placeholder="请选择门禁点">
+            <el-select v-model="qrForm.access_point_id" placeholder="请选择门禁点" @change="clearAccessLocation">
               <el-option 
                 v-for="point in accessPoints" 
                 :key="point.id" 
@@ -56,6 +61,11 @@
             </el-select>
           </el-form-item>
         </el-form>
+        <div class="location-info" v-if="currentLocation">
+          <span>{{ currentLocation }}</span>
+          <span v-if="selectedAccessPointDistance !== null">，距门禁约 {{ selectedAccessPointDistance.toFixed(1) }} 米</span>
+        </div>
+        <div class="location-error" v-else-if="locationError">{{ locationError }}</div>
         <div class="qr-code" v-if="qrCodeUrl">
           <img :src="qrCodeUrl" alt="二维码" />
           <p class="qr-tip">请将二维码对准门禁设备扫描</p>
@@ -68,7 +78,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showQRCodeDialog = false">关闭</el-button>
-          <el-button type="primary" @click="refreshQRCode">刷新二维码</el-button>
+          <el-button type="primary" @click="refreshQRCode" :loading="locating">定位并开门</el-button>
         </span>
       </template>
     </el-dialog>
@@ -76,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/access'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
@@ -94,6 +104,30 @@ const qrForm = reactive({
 })
 const qrCodeUrl = ref('')
 const cardId = ref(1) // 这里应该从登录状态中获取卡号
+const currentLatitude = ref(null)
+const currentLongitude = ref(null)
+const currentLocation = ref('')
+const locationError = ref('')
+const locating = ref(false)
+
+const selectedAccessPoint = computed(() => {
+  return accessPoints.value.find(point => point.id === qrForm.access_point_id) || null
+})
+
+const selectedAccessPointDistance = computed(() => {
+  if (!selectedAccessPoint.value || currentLatitude.value === null || currentLongitude.value === null) {
+    return null
+  }
+  if (selectedAccessPoint.value.latitude === null || selectedAccessPoint.value.longitude === null) {
+    return null
+  }
+  return calculateDistance(
+    currentLatitude.value,
+    currentLongitude.value,
+    selectedAccessPoint.value.latitude,
+    selectedAccessPoint.value.longitude
+  )
+})
 
 const loadData = () => {
   const params = {
@@ -133,7 +167,76 @@ const generateQRCode = () => {
 }
 
 const refreshQRCode = () => {
-  generateQRCode()
+  openAccessByLocation()
+}
+
+const clearAccessLocation = () => {
+  qrCodeUrl.value = ''
+  currentLocation.value = ''
+  locationError.value = ''
+}
+
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const earthRadius = 6371e3
+  const latDistance = (lat2 - lat1) * Math.PI / 180
+  const lonDistance = (lon2 - lon1) * Math.PI / 180
+  const startLat = lat1 * Math.PI / 180
+  const endLat = lat2 * Math.PI / 180
+  const a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+    + Math.cos(startLat) * Math.cos(endLat)
+    * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return earthRadius * c
+}
+
+const getBrowserLocation = () => {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('当前浏览器不支持定位'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 30000
+    })
+  })
+}
+
+const openAccessByLocation = async () => {
+  if (!qrForm.access_point_id) {
+    ElMessage.warning('请选择门禁点')
+    return
+  }
+
+  locating.value = true
+  locationError.value = ''
+  try {
+    const position = await getBrowserLocation()
+    currentLatitude.value = position.coords.latitude
+    currentLongitude.value = position.coords.longitude
+    currentLocation.value = `当前位置: 纬度 ${currentLatitude.value.toFixed(6)}, 经度 ${currentLongitude.value.toFixed(6)}`
+    const qrCode = Math.random().toString(36).substring(2, 15)
+    qrCodeUrl.value = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCode)}`
+
+    const res = await createQRAccess({
+      card_id: cardId.value,
+      access_point_id: qrForm.access_point_id,
+      qr_code: qrCode,
+      actual_latitude: currentLatitude.value,
+      actual_longitude: currentLongitude.value,
+      device_info: navigator.userAgent
+    })
+    if (res.code === 0) {
+      ElMessage.success(`开门成功，当前距离约 ${Number(res.data.distance || 0).toFixed(1)} 米`)
+      loadData()
+    }
+  } catch (error) {
+    locationError.value = error.message || '获取位置或开门失败'
+    ElMessage.error(locationError.value)
+  } finally {
+    locating.value = false
+  }
 }
 
 const handleSizeChange = (size) => {
@@ -156,6 +259,8 @@ watch(() => showQRCodeDialog.value, (newVal) => {
   if (newVal) {
     qrCodeUrl.value = ''
     qrForm.access_point_id = ''
+    currentLocation.value = ''
+    locationError.value = ''
   }
 })
 </script>
@@ -189,6 +294,20 @@ watch(() => showQRCodeDialog.value, (newVal) => {
 .qr-tip {
   margin-top: 10px;
   color: #606266;
+}
+
+.location-info,
+.location-error {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.location-info {
+  color: #409eff;
+}
+
+.location-error {
+  color: #f56c6c;
 }
 
 .qr-loading {

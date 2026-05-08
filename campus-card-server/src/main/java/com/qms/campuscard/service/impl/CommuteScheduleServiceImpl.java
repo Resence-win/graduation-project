@@ -49,7 +49,7 @@ public class CommuteScheduleServiceImpl implements CommuteScheduleService {
         }
 
         queryWrapper.eq("is_deleted", 0);
-        queryWrapper.orderByDesc("create_time");
+        queryWrapper.orderByAsc("departure_time");
         return commuteScheduleMapper.selectPage(pageParam, queryWrapper);
     }
 
@@ -62,7 +62,7 @@ public class CommuteScheduleServiceImpl implements CommuteScheduleService {
 
         QueryWrapper<CommuteSchedule> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("is_deleted", 0);
-        queryWrapper.orderByDesc("create_time");
+        queryWrapper.orderByAsc("departure_time");
         List<CommuteSchedule> list = commuteScheduleMapper.selectList(queryWrapper);
         redisUtil.set(SCHEDULE_LIST_KEY, list, CACHE_EXPIRE_TIME);
         return list;
@@ -70,6 +70,9 @@ public class CommuteScheduleServiceImpl implements CommuteScheduleService {
 
     @Override
     public List<CommuteSchedule> getSchedulesByRouteId(Long routeId) {
+        if (routeId == null) {
+            throw new RuntimeException("线路ID不能为空");
+        }
         String cacheKey = SCHEDULE_ROUTE_KEY_PREFIX + routeId;
         List<CommuteSchedule> cachedList = (List<CommuteSchedule>) redisUtil.get(cacheKey);
         if (cachedList != null) {
@@ -79,7 +82,7 @@ public class CommuteScheduleServiceImpl implements CommuteScheduleService {
         QueryWrapper<CommuteSchedule> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("route_id", routeId);
         queryWrapper.eq("is_deleted", 0);
-        queryWrapper.orderByDesc("create_time");
+        queryWrapper.orderByAsc("departure_time");
         List<CommuteSchedule> list = commuteScheduleMapper.selectList(queryWrapper);
         redisUtil.set(cacheKey, list, CACHE_EXPIRE_TIME);
         return list;
@@ -87,13 +90,19 @@ public class CommuteScheduleServiceImpl implements CommuteScheduleService {
 
     @Override
     public CommuteSchedule getScheduleById(Long id) {
+        if (id == null) {
+            return null;
+        }
         String cacheKey = SCHEDULE_INFO_KEY_PREFIX + id;
         CommuteSchedule cachedSchedule = (CommuteSchedule) redisUtil.get(cacheKey);
         if (cachedSchedule != null) {
             return cachedSchedule;
         }
 
-        CommuteSchedule schedule = commuteScheduleMapper.selectById(id);
+        QueryWrapper<CommuteSchedule> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id);
+        queryWrapper.eq("is_deleted", 0);
+        CommuteSchedule schedule = commuteScheduleMapper.selectOne(queryWrapper);
         if (schedule != null) {
             redisUtil.set(cacheKey, schedule, CACHE_EXPIRE_TIME);
         }

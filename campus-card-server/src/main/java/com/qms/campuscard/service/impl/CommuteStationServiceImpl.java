@@ -42,7 +42,14 @@ public class CommuteStationServiceImpl implements CommuteStationService {
 
     @Override
     public CommuteStation getStationById(Long id) {
-        return commuteStationMapper.selectById(id);
+        if (id == null) {
+            return null;
+        }
+
+        QueryWrapper<CommuteStation> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id);
+        queryWrapper.eq("is_deleted", 0);
+        return commuteStationMapper.selectOne(queryWrapper);
     }
 
     @Override

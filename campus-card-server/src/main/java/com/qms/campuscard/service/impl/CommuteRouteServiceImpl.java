@@ -66,13 +66,19 @@ public class CommuteRouteServiceImpl implements CommuteRouteService {
 
     @Override
     public CommuteRoute getRouteById(Long id) {
+        if (id == null) {
+            return null;
+        }
         String cacheKey = ROUTE_INFO_KEY_PREFIX + id;
         CommuteRoute cachedRoute = (CommuteRoute) redisUtil.get(cacheKey);
         if (cachedRoute != null) {
             return cachedRoute;
         }
 
-        CommuteRoute route = commuteRouteMapper.selectById(id);
+        QueryWrapper<CommuteRoute> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id);
+        queryWrapper.eq("is_deleted", 0);
+        CommuteRoute route = commuteRouteMapper.selectOne(queryWrapper);
         if (route != null) {
             redisUtil.set(cacheKey, route, CACHE_EXPIRE_TIME);
         }

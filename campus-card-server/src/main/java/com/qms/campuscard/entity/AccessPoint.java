@@ -27,6 +27,15 @@ public class AccessPoint implements Serializable {
     @TableField("location")
     private String location;
 
+    @TableField("latitude")
+    private Double latitude;
+
+    @TableField("longitude")
+    private Double longitude;
+
+    @TableField("radius")
+    private Integer radius;
+
     @TableField("device_id")
     private String deviceId;
 

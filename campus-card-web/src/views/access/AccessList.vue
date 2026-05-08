@@ -28,6 +28,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="location" label="位置" width="200" />
+        <el-table-column label="定位距离" width="120">
+          <template #default="{ row }">
+            {{ row.distance !== null && row.distance !== undefined ? Number(row.distance).toFixed(1) + '米' : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="accessTime" label="通行时间" width="180" />
       </el-table>
       
