@@ -10,6 +10,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class LoginResponse {
     private AdminUser user;
+    private Long businessUserId;
     private Long cardId;
     private String cardNo;
 }

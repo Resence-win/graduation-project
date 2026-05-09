@@ -98,7 +98,7 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
     }
 
     @Override
-    public IPage<AttendanceApplication> getApplications(String applicationType, String status, Integer page, Integer size) {
+    public IPage<AttendanceApplication> getApplications(String applicationType, String status, Long teacherId, String requesterRole, Integer page, Integer size) {
         if (page == null || page < 1) {
             page = 1;
         }
@@ -112,6 +112,15 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
         if (status != null && !status.trim().isEmpty()) {
             queryWrapper.eq("status", status.trim().toUpperCase());
         }
+        if ("teacher".equalsIgnoreCase(requesterRole)) {
+            if (teacherId == null) {
+                queryWrapper.eq("student_id", -1L);
+            } else {
+                queryWrapper.inSql("student_id", "SELECT id FROM student WHERE teacher_id = " + teacherId + " AND is_deleted = 0");
+            }
+        } else if (teacherId != null) {
+            queryWrapper.inSql("student_id", "SELECT id FROM student WHERE teacher_id = " + teacherId + " AND is_deleted = 0");
+        }
         queryWrapper.eq("is_deleted", 0);
         queryWrapper.orderByDesc("create_time");
         IPage<AttendanceApplication> result = attendanceApplicationMapper.selectPage(new Page<>(page, size), queryWrapper);
@@ -120,7 +129,7 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
     }
 
     @Override
-    public AttendanceApplication reviewApplication(Long applicationId, String status, Long reviewerId, String reviewRemark) {
+    public AttendanceApplication reviewApplication(Long applicationId, String status, Long reviewerId, String reviewerRole, String reviewRemark) {
         if (applicationId == null) {
             throw new RuntimeException("申请ID不能为空");
         }
@@ -141,6 +150,21 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
         }
         if (!"PENDING".equals(application.getStatus())) {
             throw new RuntimeException("该申请已审核，请勿重复操作");
+        }
+        if ("teacher".equalsIgnoreCase(reviewerRole)) {
+            if (reviewerId == null) {
+                throw new RuntimeException("审核老师不能为空");
+            }
+            Student applicant = studentMapper.selectById(application.getStudentId());
+            if (applicant == null || applicant.getIsDeleted() == null || applicant.getIsDeleted() != 0) {
+                throw new RuntimeException("申请学生不存在");
+            }
+            if (applicant.getTeacherId() == null) {
+                throw new RuntimeException("该学生未绑定负责老师，暂不能线上审批");
+            }
+            if (!reviewerId.equals(applicant.getTeacherId())) {
+                throw new RuntimeException("当前老师无权审批该学生的申报");
+            }
         }
 
         application.setStatus(reviewStatus);

@@ -65,6 +65,7 @@
             <el-menu-item index="/attendance/application">申报审批</el-menu-item>
           </el-sub-menu>
           <el-menu-item index="/commute">通勤车管理</el-menu-item>
+          <el-menu-item index="/college-major">学院专业管理</el-menu-item>
           <el-menu-item index="/log">系统日志</el-menu-item>
         </el-sub-menu>
     </template>

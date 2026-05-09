@@ -15,6 +15,7 @@ CREATE TABLE student (
     major VARCHAR(100),
     class_name VARCHAR(50),
     phone VARCHAR(20),
+    teacher_id BIGINT,
     attendance_mode VARCHAR(20) DEFAULT 'CAMPUS',
     attendance_status VARCHAR(20) DEFAULT 'ON_CAMPUS',
     internship_company VARCHAR(200),
@@ -33,6 +34,7 @@ COMMENT ON COLUMN student.college IS '学院';
 COMMENT ON COLUMN student.major IS '专业';
 COMMENT ON COLUMN student.class_name IS '班级';
 COMMENT ON COLUMN student.phone IS '手机号';
+COMMENT ON COLUMN student.teacher_id IS '负责老师ID';
 COMMENT ON COLUMN student.attendance_mode IS '考勤模式(CAMPUS: 在校考勤, INTERNSHIP: 校外实习)';
 COMMENT ON COLUMN student.attendance_status IS '考勤状态(ON_CAMPUS: 在校, INTERNSHIP: 外出实习, LEAVE: 已请假)';
 COMMENT ON COLUMN student.internship_company IS '实习单位';
@@ -71,7 +73,32 @@ COMMENT ON COLUMN teacher.update_time IS '更新时间';
 COMMENT ON COLUMN teacher.is_deleted IS '是否删除(0否1是)';
 
 -- ========================
--- 3. 管理员表
+-- 3. 学院专业字典表
+-- ========================
+DROP TABLE IF EXISTS college_major;
+CREATE TABLE college_major (
+    id BIGSERIAL PRIMARY KEY,
+    college_name VARCHAR(100) NOT NULL,
+    major_name VARCHAR(100) NOT NULL,
+    status INT DEFAULT 1,
+    sort_order INT DEFAULT 0,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE college_major IS '学院专业字典表';
+COMMENT ON COLUMN college_major.id IS '主键ID';
+COMMENT ON COLUMN college_major.college_name IS '学院名称';
+COMMENT ON COLUMN college_major.major_name IS '专业名称';
+COMMENT ON COLUMN college_major.status IS '状态(1启用0停用)';
+COMMENT ON COLUMN college_major.sort_order IS '排序值';
+COMMENT ON COLUMN college_major.create_time IS '创建时间';
+COMMENT ON COLUMN college_major.update_time IS '更新时间';
+COMMENT ON COLUMN college_major.is_deleted IS '是否删除(0否1是)';
+
+-- ========================
+-- 4. 管理员表
 -- ========================
 DROP TABLE IF EXISTS admin_user;
 CREATE TABLE admin_user (
@@ -94,7 +121,7 @@ COMMENT ON COLUMN admin_user.create_time IS '创建时间';
 COMMENT ON COLUMN admin_user.is_deleted IS '是否删除';
 
 -- ========================
--- 4. 校园卡表
+-- 5. 校园卡表
 -- ========================
 DROP TABLE IF EXISTS campus_card;
 CREATE TABLE campus_card (
@@ -123,7 +150,7 @@ COMMENT ON COLUMN campus_card.update_time IS '更新时间';
 COMMENT ON COLUMN campus_card.is_deleted IS '是否删除';
 
 -- ========================
--- 5. 卡操作记录
+-- 6. 卡操作记录
 -- ========================
 DROP TABLE IF EXISTS card_change_record;
 CREATE TABLE card_change_record (
@@ -146,7 +173,7 @@ COMMENT ON COLUMN card_change_record.create_time IS '创建时间';
 COMMENT ON COLUMN card_change_record.is_deleted IS '是否删除';
 
 -- ========================
--- 6. 账户表
+-- 7. 账户表
 -- ========================
 DROP TABLE IF EXISTS account;
 CREATE TABLE account (
@@ -169,7 +196,7 @@ COMMENT ON COLUMN account.update_time IS '更新时间';
 COMMENT ON COLUMN account.is_deleted IS '是否删除';
 
 -- ========================
--- 7. 账户流水
+-- 8. 账户流水
 -- ========================
 DROP TABLE IF EXISTS account_flow;
 CREATE TABLE account_flow (
@@ -194,7 +221,7 @@ COMMENT ON COLUMN account_flow.create_time IS '创建时间';
 COMMENT ON COLUMN account_flow.is_deleted IS '是否删除';
 
 -- ========================
--- 8. 充值记录
+-- 9. 充值记录
 -- ========================
 DROP TABLE IF EXISTS recharge_record;
 CREATE TABLE recharge_record (
@@ -217,7 +244,7 @@ COMMENT ON COLUMN recharge_record.create_time IS '创建时间';
 COMMENT ON COLUMN recharge_record.is_deleted IS '是否删除';
 
 -- ========================
--- 9. 消费记录
+-- 10. 消费记录
 -- ========================
 DROP TABLE IF EXISTS consume_record;
 CREATE TABLE consume_record (
@@ -242,7 +269,7 @@ COMMENT ON COLUMN consume_record.consume_time IS '消费时间';
 COMMENT ON COLUMN consume_record.is_deleted IS '是否删除';
 
 -- ========================
--- 10. 商户类型
+-- 11. 商户类型
 -- ========================
 DROP TABLE IF EXISTS merchant_type;
 CREATE TABLE merchant_type (
@@ -748,6 +775,11 @@ ADD CONSTRAINT uk_merchant_name UNIQUE(merchant_name);
 ALTER TABLE admin_user 
 ADD CONSTRAINT uk_admin_username UNIQUE(username);
 
+-- 8. 未删除的学院专业不重复
+CREATE UNIQUE INDEX uk_college_major_active
+ON college_major(college_name, major_name)
+WHERE is_deleted = 0;
+
 -- ========================
 -- 索引
 -- ========================
@@ -777,9 +809,12 @@ CREATE INDEX idx_account_flow_time ON account_flow(create_time);
 
 -- 用户相关索引
 CREATE INDEX idx_student_no ON student(student_no);
+CREATE INDEX idx_student_teacher_id ON student(teacher_id);
 CREATE INDEX idx_student_attendance_mode ON student(attendance_mode);
 CREATE INDEX idx_student_attendance_status ON student(attendance_status);
 CREATE INDEX idx_teacher_no ON teacher(teacher_no);
+CREATE INDEX idx_college_major_college ON college_major(college_name);
+CREATE INDEX idx_college_major_status ON college_major(status);
 
 -- 商户相关索引
 CREATE INDEX idx_merchant_type_id ON merchant(type_id);
@@ -815,6 +850,13 @@ CREATE INDEX idx_commute_vehicle_plate ON commute_vehicle(plate_number);
 CREATE INDEX idx_commute_vehicle_status ON commute_vehicle(status);
 CREATE INDEX idx_commute_station_name ON commute_station(station_name);
 CREATE INDEX idx_commute_station_status ON commute_station(status);
+
+-- 学院专业基础数据
+INSERT INTO college_major (college_name, major_name, sort_order) VALUES
+('计算机学院', '计算机科学与技术', 1),
+('计算机学院', '软件工程', 2),
+('信息工程学院', '电子信息工程', 3),
+('经济管理学院', '工商管理', 4);
 CREATE INDEX idx_commute_schedule_route ON commute_schedule(route_id);
 CREATE INDEX idx_commute_schedule_vehicle ON commute_schedule(vehicle_id);
 CREATE INDEX idx_commute_schedule_departure ON commute_schedule(departure_time);

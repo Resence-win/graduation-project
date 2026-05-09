@@ -69,6 +69,7 @@ public class AdminController {
                 Student student = studentMapper.selectOne(studentWrapper);
                 if (student != null) {
                     userId = student.getId();
+                    loginResponse.setBusinessUserId(student.getId());
                 }
             } else if ("teacher".equals(normalizedRole)) {
                 // 根据教师号查询教师信息
@@ -78,6 +79,7 @@ public class AdminController {
                 Teacher teacher = teacherMapper.selectOne(teacherWrapper);
                 if (teacher != null) {
                     userId = teacher.getId();
+                    loginResponse.setBusinessUserId(teacher.getId());
                 }
             }
             

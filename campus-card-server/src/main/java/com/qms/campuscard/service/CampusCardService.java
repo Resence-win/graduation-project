@@ -2,6 +2,7 @@ package com.qms.campuscard.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.qms.campuscard.dto.AccountDTO;
 import com.qms.campuscard.entity.Account;
 import com.qms.campuscard.entity.AccountFlow;
 import com.qms.campuscard.entity.CampusCard;
@@ -33,6 +34,8 @@ public interface CampusCardService {
     Account getAccountByCardId(Long cardId);
 
     Account getAccountByCardNo(String cardNo);
+
+    AccountDTO getAccountDetailByCardNo(String cardNo);
 
     com.qms.campuscard.dto.CampusCardDTO getCardByCardNo(String cardNo);
 

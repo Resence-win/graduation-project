@@ -99,6 +99,8 @@ const loadData = async () => {
     const res = await getAttendanceApplications({
       application_type: searchForm.applicationType,
       status: searchForm.status,
+      teacher_id: currentUser.value.role === 'teacher' ? currentUser.value.businessUserId : undefined,
+      requester_role: currentUser.value.role,
       page: pagination.page,
       size: pagination.size
     })
@@ -126,6 +128,7 @@ const handleReview = async (row, status) => {
       application_id: row.id,
       status,
       reviewer_id: getCurrentUserId(),
+      reviewer_role: currentUser.value.role,
       review_remark: value || ''
     })
     if (res.code === 0) {
@@ -189,17 +192,28 @@ const getApplicationTypeText = (type) => {
   return map[type] || '考勤'
 }
 
+const currentUser = ref({})
+
 const getCurrentUserId = () => {
   const userStr = localStorage.getItem('user')
   if (!userStr) return undefined
   try {
-    return JSON.parse(userStr).id
+    const user = JSON.parse(userStr)
+    return user.role === 'teacher' ? user.businessUserId : user.id
   } catch (error) {
     return undefined
   }
 }
 
 onMounted(() => {
+  const userStr = localStorage.getItem('user')
+  if (userStr) {
+    try {
+      currentUser.value = JSON.parse(userStr)
+    } catch (error) {
+      currentUser.value = {}
+    }
+  }
   loadData()
 })
 </script>

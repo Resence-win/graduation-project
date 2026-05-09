@@ -3,6 +3,7 @@ package com.qms.campuscard.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.qms.campuscard.dto.AccountDTO;
 import com.qms.campuscard.entity.*;
 import com.qms.campuscard.mapper.*;
 import com.qms.campuscard.service.CampusCardService;
@@ -428,6 +429,45 @@ public class CampusCardServiceImpl implements CampusCardService {
         
         // 根据校园卡ID查询账户
         return getAccountByCardId(campusCard.getId());
+    }
+
+    @Override
+    public AccountDTO getAccountDetailByCardNo(String cardNo) {
+        QueryWrapper<CampusCard> cardQueryWrapper = new QueryWrapper<>();
+        cardQueryWrapper.eq("card_no", cardNo);
+        cardQueryWrapper.eq("is_deleted", 0);
+        CampusCard campusCard = campusCardMapper.selectOne(cardQueryWrapper);
+
+        if (campusCard == null) {
+            return null;
+        }
+
+        Account account = getAccountByCardId(campusCard.getId());
+        if (account == null) {
+            return null;
+        }
+
+        AccountDTO dto = new AccountDTO();
+        dto.setId(account.getId());
+        dto.setCardId(account.getCardId());
+        dto.setCardNo(campusCard.getCardNo());
+        dto.setBalance(account.getBalance());
+        dto.setStatus(account.getStatus());
+        dto.setCreateTime(account.getCreateTime());
+        dto.setUpdateTime(account.getUpdateTime());
+        dto.setIsDeleted(account.getIsDeleted());
+
+        if ("student".equals(campusCard.getUserType())) {
+            QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
+            studentQueryWrapper.eq("id", campusCard.getUserId());
+            studentQueryWrapper.eq("is_deleted", 0);
+            Student student = studentMapper.selectOne(studentQueryWrapper);
+            if (student != null) {
+                dto.setStudentName(student.getName());
+            }
+        }
+
+        return dto;
     }
 
     @Override

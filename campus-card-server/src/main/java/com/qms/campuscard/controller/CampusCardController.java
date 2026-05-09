@@ -3,6 +3,7 @@ package com.qms.campuscard.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.qms.campuscard.common.Result;
 import com.qms.campuscard.common.LogUtil;
+import com.qms.campuscard.dto.AccountDTO;
 import com.qms.campuscard.dto.CampusCardDTO;
 import com.qms.campuscard.dto.CardOperationRequest;
 import com.qms.campuscard.dto.OpenCardRequest;
@@ -134,8 +135,8 @@ public class CampusCardController {
     }
 
     @GetMapping("/account/by-card-no/{cardNo}")
-    public Result<Account> getAccountByCardNo(@PathVariable String cardNo) {
-        Account account = campusCardService.getAccountByCardNo(cardNo);
+    public Result<AccountDTO> getAccountByCardNo(@PathVariable String cardNo) {
+        AccountDTO account = campusCardService.getAccountDetailByCardNo(cardNo);
         if (account != null) {
             // 记录日志
             logUtil.recordLog(1L, "查询", "account", account.getId(), "根据卡号查询账户信息：" + cardNo);

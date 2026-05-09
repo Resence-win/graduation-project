@@ -37,6 +37,7 @@
         <el-table-column prop="college" label="学院" width="150" />
         <el-table-column prop="major" label="专业" width="150" />
         <el-table-column prop="className" label="班级" width="100" />
+        <el-table-column prop="teacherName" label="负责老师" width="120" />
         <el-table-column prop="phone" label="手机号" width="120" />
         <el-table-column label="考勤模式" width="110">
           <template #default="{ row }">
@@ -99,16 +100,52 @@
           </el-select>
         </el-form-item>
         <el-form-item label="学院" prop="college">
-          <el-input v-model="form.college" placeholder="请输入学院" />
+          <el-select
+            v-model="form.college"
+            placeholder="请选择学院"
+            filterable
+            style="width: 100%"
+            @change="handleCollegeChange"
+          >
+            <el-option
+              v-for="college in collegeOptions"
+              :key="college"
+              :label="college"
+              :value="college"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="专业" prop="major">
-          <el-input v-model="form.major" placeholder="请输入专业" />
+          <el-select
+            v-model="form.major"
+            placeholder="请选择专业"
+            filterable
+            style="width: 100%"
+            :disabled="!form.college"
+          >
+            <el-option
+              v-for="major in majorOptions"
+              :key="major"
+              :label="major"
+              :value="major"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="班级" prop="className">
           <el-input v-model="form.className" placeholder="请输入班级" />
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="form.phone" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-form-item label="负责老师" prop="teacherId">
+          <el-select v-model="form.teacherId" placeholder="请选择负责老师" filterable clearable>
+            <el-option
+              v-for="teacher in teacherOptions"
+              :key="teacher.id"
+              :label="`${teacher.name}（${teacher.teacherNo}）`"
+              :value="teacher.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="考勤模式" prop="attendanceMode">
           <el-select v-model="form.attendanceMode" placeholder="请选择考勤模式">
@@ -181,15 +218,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getStudentList, addStudent, updateStudent, deleteStudent, exportStudents, importStudents, downloadImportTemplate } from '@/api/student'
+import { getTeacherList } from '@/api/teacher'
 import { resetPassword } from '@/api/admin'
+import { getCollegeMajorOptions } from '@/api/collegeMajor'
 
 const formRef = ref(null)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增学生')
 const tableData = ref([])
+const teacherOptions = ref([])
+const collegeMajorOptions = ref({})
 const dialogImportVisible = ref(false)
 const uploadRef = ref(null)
 const fileList = ref([])
@@ -215,6 +256,7 @@ const form = reactive({
   major: '',
   className: '',
   phone: '',
+  teacherId: null,
   attendanceMode: 'CAMPUS',
   attendanceStatus: 'ON_CAMPUS',
   internshipCompany: '',
@@ -232,10 +274,10 @@ const rules = {
     { required: true, message: '请选择性别', trigger: 'change' }
   ],
   college: [
-    { required: true, message: '请输入学院', trigger: 'blur' }
+    { required: true, message: '请选择学院', trigger: 'change' }
   ],
   major: [
-    { required: true, message: '请输入专业', trigger: 'blur' }
+    { required: true, message: '请选择专业', trigger: 'change' }
   ],
   className: [
     { required: true, message: '请输入班级', trigger: 'blur' }
@@ -243,10 +285,45 @@ const rules = {
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
   ],
+  teacherId: [
+    { required: true, message: '请选择负责老师', trigger: 'change' }
+  ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
   ]
+}
+
+const collegeOptions = computed(() => Object.keys(collegeMajorOptions.value))
+const majorOptions = computed(() => collegeMajorOptions.value[form.college] || [])
+
+const loadCollegeMajorOptions = async () => {
+  try {
+    const res = await getCollegeMajorOptions()
+    if (res.code === 0) {
+      collegeMajorOptions.value = res.data || {}
+    }
+  } catch (error) {
+    console.error('加载学院专业失败:', error)
+  }
+}
+
+const handleCollegeChange = () => {
+  form.major = ''
+}
+
+const loadTeachers = async () => {
+  try {
+    const res = await getTeacherList({
+      page: 1,
+      size: 1000
+    })
+    if (res.code === 0) {
+      teacherOptions.value = res.data.records || []
+    }
+  } catch (error) {
+    console.error('加载教师列表失败:', error)
+  }
 }
 
 const loadData = async () => {
@@ -288,6 +365,7 @@ const handleAdd = () => {
     major: '',
     className: '',
     phone: '',
+    teacherId: null,
     attendanceMode: 'CAMPUS',
     attendanceStatus: 'ON_CAMPUS',
     internshipCompany: '',
@@ -451,6 +529,8 @@ const handleDownloadTemplate = async () => {
 }
 
 onMounted(() => {
+  loadCollegeMajorOptions()
+  loadTeachers()
   loadData()
 })
 </script>

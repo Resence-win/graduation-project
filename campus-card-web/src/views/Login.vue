@@ -104,6 +104,7 @@ const handleLogin = async () => {
       const userInfo = {
         ...res.data.user,
         role: userRole,
+        businessUserId: res.data.businessUserId,
         cardId: res.data.cardId,
         cardNo: res.data.cardNo
       }

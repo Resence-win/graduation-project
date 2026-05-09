@@ -11,7 +11,7 @@ public interface AttendanceApplicationService {
 
     IPage<AttendanceApplication> getApplicationsByCardId(Long cardId, Integer page, Integer size);
 
-    IPage<AttendanceApplication> getApplications(String applicationType, String status, Integer page, Integer size);
+    IPage<AttendanceApplication> getApplications(String applicationType, String status, Long teacherId, String requesterRole, Integer page, Integer size);
 
-    AttendanceApplication reviewApplication(Long applicationId, String status, Long reviewerId, String reviewRemark);
+    AttendanceApplication reviewApplication(Long applicationId, String status, Long reviewerId, String reviewerRole, String reviewRemark);
 }

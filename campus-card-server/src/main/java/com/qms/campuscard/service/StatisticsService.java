@@ -5,6 +5,8 @@ import java.util.Map;
 
 public interface StatisticsService {
 
+    Map<String, Object> getOverview(String startDate, String endDate);
+
     List<Map<String, Object>> getConsumeStatistics(String startDate, String endDate);
 
     List<Map<String, Object>> getUserRank(String startDate, String endDate, Integer limit);

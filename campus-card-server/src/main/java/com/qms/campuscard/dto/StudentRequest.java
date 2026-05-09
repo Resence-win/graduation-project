@@ -11,6 +11,7 @@ public class StudentRequest {
     private String major;
     private String className;
     private String phone;
+    private Long teacherId;
     private String attendanceMode;
     private String attendanceStatus;
     private String internshipCompany;

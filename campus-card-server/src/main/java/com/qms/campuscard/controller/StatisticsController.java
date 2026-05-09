@@ -20,6 +20,15 @@ public class StatisticsController {
     @Resource
     private LogUtil logUtil;
 
+    @GetMapping("/api/stat/overview")
+    public Result<Map<String, Object>> getOverview(
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date) {
+        Map<String, Object> data = statisticsService.getOverview(start_date, end_date);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询综合数据概览，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
+        return Result.success(data);
+    }
+
     @GetMapping("/api/stat/consume")
     public Result<List<Map<String, Object>>> getConsumeStatistics(
             @RequestParam(required = false, defaultValue = "") String start_date,

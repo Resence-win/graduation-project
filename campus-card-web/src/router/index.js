@@ -87,6 +87,12 @@ const routes = [
         meta: { title: '数据统计', requiresAdmin: true }
       },
       {
+        path: 'college-major',
+        name: 'CollegeMajor',
+        component: () => import('@/views/system/CollegeMajorList.vue'),
+        meta: { title: '学院专业管理', requiresAdmin: true }
+      },
+      {
         path: 'book',
         name: 'Book',
         component: () => import('@/views/book/BookList.vue'),

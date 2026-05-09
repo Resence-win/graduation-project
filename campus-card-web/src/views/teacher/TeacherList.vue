@@ -79,7 +79,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="所属学院" prop="department">
-          <el-input v-model="form.department" placeholder="请输入所属学院" />
+          <el-select v-model="form.department" placeholder="请选择所属学院" filterable style="width: 100%">
+            <el-option
+              v-for="college in collegeOptions"
+              :key="college"
+              :label="college"
+              :value="college"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="form.phone" placeholder="请输入手机号" />
@@ -97,15 +104,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTeacherList, addTeacher, updateTeacher, deleteTeacher } from '@/api/teacher'
 import { resetPassword } from '@/api/admin'
+import { getCollegeMajorOptions } from '@/api/collegeMajor'
 
 const formRef = ref(null)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增教师')
 const tableData = ref([])
+const collegeMajorOptions = ref({})
 
 const searchForm = reactive({
   teacherNo: '',
@@ -139,7 +148,7 @@ const rules = {
     { required: true, message: '请选择性别', trigger: 'change' }
   ],
   department: [
-    { required: true, message: '请输入所属学院', trigger: 'blur' }
+    { required: true, message: '请选择所属学院', trigger: 'change' }
   ],
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
@@ -148,6 +157,19 @@ const rules = {
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
   ]
+}
+
+const collegeOptions = computed(() => Object.keys(collegeMajorOptions.value))
+
+const loadCollegeMajorOptions = async () => {
+  try {
+    const res = await getCollegeMajorOptions()
+    if (res.code === 0) {
+      collegeMajorOptions.value = res.data || {}
+    }
+  } catch (error) {
+    console.error('加载学院列表失败:', error)
+  }
 }
 
 const loadData = async () => {
@@ -274,6 +296,7 @@ const handleCurrentChange = (val) => {
 }
 
 onMounted(() => {
+  loadCollegeMajorOptions()
   loadData()
 })
 </script>

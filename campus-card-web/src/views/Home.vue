@@ -1,4 +1,4 @@
-<template>
+x<template>
   <div class="home-container">
     <el-row :gutter="20">
       <el-col :span="6">
@@ -22,7 +22,7 @@
         </el-card>
       </el-col>
     </el-row>
-    
+
     <el-row :gutter="20" style="margin-top: 20px">
       <el-col :span="12">
         <el-card>

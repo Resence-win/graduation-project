@@ -42,6 +42,12 @@ public class Student implements Serializable {
     @TableField("phone")
     private String phone;
 
+    @TableField("teacher_id")
+    private Long teacherId;
+
+    @TableField(exist = false)
+    private String teacherName;
+
     @TableField("attendance_mode")
     private String attendanceMode;
 

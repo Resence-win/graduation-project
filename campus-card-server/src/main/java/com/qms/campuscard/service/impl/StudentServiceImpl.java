@@ -6,8 +6,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.dto.StudentRequest;
 import com.qms.campuscard.entity.AdminUser;
 import com.qms.campuscard.entity.Student;
+import com.qms.campuscard.entity.Teacher;
 import com.qms.campuscard.mapper.AdminUserMapper;
 import com.qms.campuscard.mapper.StudentMapper;
+import com.qms.campuscard.mapper.TeacherMapper;
 import com.qms.campuscard.service.StudentService;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +27,9 @@ public class StudentServiceImpl implements StudentService {
     
     @Resource
     private AdminUserMapper adminUserMapper;
+
+    @Resource
+    private TeacherMapper teacherMapper;
 
     @Override
     public boolean addStudent(Student student) {
@@ -45,6 +50,7 @@ public class StudentServiceImpl implements StudentService {
         student.setMajor(studentRequest.getMajor());
         student.setClassName(studentRequest.getClassName());
         student.setPhone(studentRequest.getPhone());
+        student.setTeacherId(studentRequest.getTeacherId());
         student.setAttendanceMode(normalizeAttendanceMode(studentRequest.getAttendanceMode()));
         student.setAttendanceStatus(normalizeAttendanceStatus(studentRequest.getAttendanceStatus()));
         student.setInternshipCompany(studentRequest.getInternshipCompany());
@@ -97,7 +103,9 @@ public class StudentServiceImpl implements StudentService {
         }
         
         queryWrapper.orderByDesc("create_time");
-        return studentMapper.selectPage(page, queryWrapper);
+        IPage<Student> result = studentMapper.selectPage(page, queryWrapper);
+        fillTeacherName(result.getRecords());
+        return result;
     }
 
     @Override
@@ -105,7 +113,9 @@ public class StudentServiceImpl implements StudentService {
         QueryWrapper<Student> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("id", id);
         queryWrapper.eq("is_deleted", 0);
-        return studentMapper.selectOne(queryWrapper);
+        Student student = studentMapper.selectOne(queryWrapper);
+        fillTeacherName(student);
+        return student;
     }
     
     @Override
@@ -113,7 +123,9 @@ public class StudentServiceImpl implements StudentService {
         QueryWrapper<Student> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("student_no", studentNo);
         queryWrapper.eq("is_deleted", 0);
-        return studentMapper.selectOne(queryWrapper);
+        Student student = studentMapper.selectOne(queryWrapper);
+        fillTeacherName(student);
+        return student;
     }
 
     @Override
@@ -136,6 +148,25 @@ public class StudentServiceImpl implements StudentService {
             return "ON_CAMPUS";
         }
         return attendanceStatus.trim().toUpperCase();
+    }
+
+    private void fillTeacherName(List<Student> students) {
+        if (students == null || students.isEmpty()) {
+            return;
+        }
+        for (Student student : students) {
+            fillTeacherName(student);
+        }
+    }
+
+    private void fillTeacherName(Student student) {
+        if (student == null || student.getTeacherId() == null) {
+            return;
+        }
+        Teacher teacher = teacherMapper.selectById(student.getTeacherId());
+        if (teacher != null && teacher.getIsDeleted() != null && teacher.getIsDeleted() == 0) {
+            student.setTeacherName(teacher.getName());
+        }
     }
 
     @Override

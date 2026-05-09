@@ -152,9 +152,11 @@ public class AttendanceController {
     public Result<IPage<AttendanceApplication>> getApplications(
             @RequestParam(required = false) String application_type,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long teacher_id,
+            @RequestParam(required = false) String requester_role,
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size) {
-        return Result.success(attendanceApplicationService.getApplications(application_type, status, page, size));
+        return Result.success(attendanceApplicationService.getApplications(application_type, status, teacher_id, requester_role, page, size));
     }
 
     @PostMapping("/application/review")
@@ -162,7 +164,8 @@ public class AttendanceController {
             @RequestParam Long application_id,
             @RequestParam String status,
             @RequestParam(required = false) Long reviewer_id,
+            @RequestParam(required = false) String reviewer_role,
             @RequestParam(required = false) String review_remark) {
-        return Result.success(attendanceApplicationService.reviewApplication(application_id, status, reviewer_id, review_remark));
+        return Result.success(attendanceApplicationService.reviewApplication(application_id, status, reviewer_id, reviewer_role, review_remark));
     }
 }

@@ -19,7 +19,12 @@
       
       <el-table :data="tableData" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="cardId" label="卡ID" width="100" />
+        <el-table-column prop="cardNo" label="卡号" width="160" />
+        <el-table-column prop="studentName" label="学生姓名" width="120">
+          <template #default="{ row }">
+            {{ row.studentName || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="balance" label="余额" width="120">
           <template #default="{ row }">
             <span style="color: #409EFF; font-weight: bold">¥{{ row.balance }}</span>
