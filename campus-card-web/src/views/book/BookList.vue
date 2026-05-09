@@ -7,7 +7,7 @@
           <el-button type="primary" @click="handleAdd">新增图书</el-button>
         </div>
       </template>
-      
+
       <el-form :inline="true" :model="searchForm">
         <el-form-item label="书名">
           <el-input v-model="searchForm.bookName" placeholder="请输入书名" clearable />
@@ -29,9 +29,9 @@
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-      
+
       <el-table :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column type="index" label="ID" width="80" :index="indexMethod" />
         <el-table-column prop="bookName" label="书名" width="200" />
         <el-table-column prop="author" label="作者" width="120" />
         <el-table-column prop="collectionLocation" label="所属馆藏地" min-width="180" />
@@ -61,7 +61,7 @@
           </template>
         </el-table-column>
       </el-table>
-      
+
       <el-pagination
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.size"
@@ -73,7 +73,7 @@
         style="margin-top: 20px; justify-content: flex-end"
       />
     </el-card>
-    
+
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
@@ -95,7 +95,7 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
-    
+
     <el-dialog
       v-model="uploadDialogVisible"
       title="上传封面"
@@ -239,12 +239,12 @@ const handleUploadSubmit = async () => {
     ElMessage.warning('请选择要上传的图片')
     return
   }
-  
+
   try {
     const formData = new FormData()
     formData.append('file', uploadFile.value)
     formData.append('book_id', currentBookId.value)
-    
+
     const res = await uploadBookLogo(formData)
     if (res.code === 0) {
       ElMessage.success('上传成功')
@@ -263,7 +263,7 @@ const handleDelete = async (row) => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
+
     const res = await deleteBook(row.id)
     if (res.code === 0) {
       ElMessage.success('删除成功')
@@ -279,14 +279,14 @@ const handleDelete = async (row) => {
 const handleSubmit = async () => {
   try {
     await formRef.value.validate()
-    
+
     let res
     if (form.id) {
       res = await updateBook(form)
     } else {
       res = await addBook(form)
     }
-    
+
     if (res.code === 0) {
       ElMessage.success(form.id ? '更新成功' : '新增成功')
       dialogVisible.value = false
@@ -308,6 +308,11 @@ const handleCurrentChange = (val) => {
   pagination.page = val
   loadData()
 }
+
+const indexMethod = (index) => {
+  return (pagination.page - 1) * pagination.size + index + 1
+}
+
 
 onMounted(() => {
   loadData()

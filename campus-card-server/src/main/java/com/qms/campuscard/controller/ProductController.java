@@ -25,6 +25,9 @@ public class ProductController {
         this.productService = productService;
     }
 
+    /**
+     * 新增商品接口：为指定商户创建可销售商品并维护价格、库存等信息。
+     */
     @PostMapping
     public Result<Boolean> addProduct(@RequestBody Product product) {
         boolean success = productService.addProduct(product);
@@ -52,12 +55,18 @@ public class ProductController {
         return success ? Result.success("删除成功", true) : Result.error("删除失败");
     }
 
+    /**
+     * 商品详情接口：根据商品ID查询商品基础信息和库存状态。
+     */
     @GetMapping("/{id}")
     public Result<Product> getProduct(@PathVariable Long id) {
         Product product = productService.getProductById(id);
         return product != null ? Result.success(product) : Result.error("商品不存在");
     }
 
+    /**
+     * 商品列表接口：按商品名称、商户和状态分页查询商品信息。
+     */
     @GetMapping("/list")
     public Result<IPage<ProductDTO>> getProductList(
             @RequestParam(required = false, defaultValue = "1") Integer page,
@@ -70,6 +79,9 @@ public class ProductController {
         return Result.success(productPage);
     }
 
+    /**
+     * 商品图片上传接口：上传并保存指定商品的展示图片地址。
+     */
     @PostMapping("/upload-image")
     public Result<String> uploadImage(@RequestParam("file") MultipartFile file, @RequestParam("product_id") Long productId) {
         String url = productService.uploadImage(file, productId);

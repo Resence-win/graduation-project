@@ -24,6 +24,9 @@ public class TeacherController {
         this.teacherService = teacherService;
     }
 
+    /**
+     * 新增教师接口：录入教师基础信息，并创建对应登录账号。
+     */
     @PostMapping
     public Result<Boolean> addTeacher(@RequestBody TeacherRequest teacherRequest) {
         boolean success = teacherService.addTeacher(teacherRequest);
@@ -36,6 +39,9 @@ public class TeacherController {
         }
     }
 
+    /**
+     * 教师列表接口：按教师编号、姓名等条件分页查询教师档案。
+     */
     @GetMapping("/list")
     public Result<IPage<Teacher>> getTeacherList(
             @RequestParam(defaultValue = "1") Integer page,
@@ -61,6 +67,9 @@ public class TeacherController {
         }
     }
     
+    /**
+     * 教师编号查询接口：根据教师编号查询教师详情，供登录后绑定业务身份使用。
+     */
     @GetMapping("/by-no/{teacherNo}")
     public Result<Teacher> getTeacherByTeacherNo(@PathVariable String teacherNo) {
         Teacher teacher = teacherService.getTeacherByTeacherNo(teacherNo);

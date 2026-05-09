@@ -28,7 +28,7 @@
       </el-form>
 
       <el-table :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="记录ID" width="90" />
+        <el-table-column type="index" label="记录ID" width="90" :index="indexMethod" />
         <el-table-column prop="bookName" label="图书名称" min-width="180" />
         <el-table-column prop="collectionLocation" label="馆藏地" min-width="160" />
         <el-table-column prop="cardNo" label="校园卡号" width="150" />
@@ -184,6 +184,11 @@ const handleCurrentChange = (val) => {
   pagination.page = val
   loadData()
 }
+
+const indexMethod = (index) => {
+  return (pagination.page - 1) * pagination.size + index + 1
+}
+
 
 onMounted(() => {
   loadData()

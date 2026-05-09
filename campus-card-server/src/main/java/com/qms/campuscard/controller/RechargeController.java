@@ -23,6 +23,9 @@ public class RechargeController {
         this.rechargeService = rechargeService;
     }
 
+    /**
+     * 充值接口：根据校园卡ID为账户增加余额，并写入充值记录和资金流水。
+     */
     @PostMapping
     public Result<Boolean> recharge(@RequestBody RechargeRequest request) {
         try {
@@ -41,6 +44,9 @@ public class RechargeController {
         }
     }
 
+    /**
+     * 卡号充值接口：根据实体卡号完成充值，适合收银台或人工充值场景。
+     */
     @PostMapping("/by-card-no")
     public Result<Boolean> rechargeByCardNo(@RequestBody RechargeByCardNoRequest request) {
         try {
@@ -59,6 +65,9 @@ public class RechargeController {
         }
     }
 
+    /**
+     * 充值记录接口：按卡ID或卡号分页查询充值明细。
+     */
     @GetMapping("/list")
     public Result<IPage<com.qms.campuscard.dto.RechargeRecordDTO>> getRechargeRecords(
             @RequestParam(required = false) Long card_id,

@@ -27,6 +27,9 @@ public class AttendanceController {
     private AttendanceApplicationService attendanceApplicationService;
 
     // 打卡位置相关接口
+    /**
+     * 创建考勤点接口：教师或管理员配置可打卡的位置、经纬度和有效范围。
+     */
     @PostMapping("/location")
     public Result<AttendanceLocation> createLocation(@RequestBody AttendanceLocation location) {
         AttendanceLocation createdLocation = attendanceLocationService.createLocation(location);
@@ -51,6 +54,9 @@ public class AttendanceController {
         return Result.success(location);
     }
 
+    /**
+     * 教师考勤点接口：分页查询指定教师创建或负责的考勤地点。
+     */
     @GetMapping("/location/teacher/{teacherId}")
     public Result<IPage<AttendanceLocation>> getLocationsByTeacherId(
             @PathVariable Long teacherId,
@@ -68,12 +74,18 @@ public class AttendanceController {
         return Result.success(locations);
     }
 
+    /**
+     * 可用考勤点接口：查询当前启用的考勤地点，供学生打卡时选择。
+     */
     @GetMapping("/location/active")
     public Result<?> getActiveLocations() {
         return Result.success(attendanceLocationService.getActiveLocations());
     }
 
     // 考勤记录相关接口
+    /**
+     * 考勤记录接口：按校园卡、状态和日期范围分页查询学生打卡记录。
+     */
     @GetMapping("/list")
     public Result<IPage<AttendanceRecord>> getAttendanceRecords(
             @RequestParam(required = false) Long card_id,
@@ -86,6 +98,9 @@ public class AttendanceController {
         return Result.success(attendanceRecords);
     }
 
+    /**
+     * 学生打卡接口：记录学生当前位置、设备和考勤类型，并判断打卡状态。
+     */
     @PostMapping("/checkin")
     public Result<AttendanceRecord> createAttendance(
             @RequestParam Long card_id,
@@ -103,6 +118,9 @@ public class AttendanceController {
         return Result.success(attendanceRecord);
     }
 
+    /**
+     * 考勤统计接口：按时间范围分页汇总考勤数据，供后台统计页面展示。
+     */
     @GetMapping("/statistics")
     public Result<IPage<AttendanceRecord>> getAttendanceStatistics(
             @RequestParam(required = false) String start_date,
@@ -113,6 +131,9 @@ public class AttendanceController {
         return Result.success(attendanceStatistics);
     }
 
+    /**
+     * 考勤概览接口：按时间范围汇总正常、异常等考勤状态数量。
+     */
     @GetMapping("/summary")
     public Result<Map<String, Long>> getAttendanceSummary(
             @RequestParam(required = false) String start_date,
@@ -130,16 +151,25 @@ public class AttendanceController {
         return Result.success(records);
     }
 
+    /**
+     * 实习申请接口：学生提交实习考勤申请，用于变更后续考勤方式。
+     */
     @PostMapping("/application/internship")
     public Result<AttendanceApplication> submitInternshipApplication(@RequestBody AttendanceApplication application) {
         return Result.success(attendanceApplicationService.submitInternshipApplication(application));
     }
 
+    /**
+     * 请假申请接口：学生提交请假申请，等待教师或管理员审核。
+     */
     @PostMapping("/application/leave")
     public Result<AttendanceApplication> submitLeaveApplication(@RequestBody AttendanceApplication application) {
         return Result.success(attendanceApplicationService.submitLeaveApplication(application));
     }
 
+    /**
+     * 我的申请接口：按校园卡分页查询当前学生提交的请假或实习申请。
+     */
     @GetMapping("/application/my")
     public Result<IPage<AttendanceApplication>> getMyApplications(
             @RequestParam Long card_id,
@@ -148,6 +178,9 @@ public class AttendanceController {
         return Result.success(attendanceApplicationService.getApplicationsByCardId(card_id, page, size));
     }
 
+    /**
+     * 考勤申请列表接口：按申请类型、状态、审核人等条件分页查询申请记录。
+     */
     @GetMapping("/application/list")
     public Result<IPage<AttendanceApplication>> getApplications(
             @RequestParam(required = false) String application_type,
@@ -159,6 +192,9 @@ public class AttendanceController {
         return Result.success(attendanceApplicationService.getApplications(application_type, status, teacher_id, requester_role, page, size));
     }
 
+    /**
+     * 考勤申请审核接口：教师或管理员审批请假、实习申请并写入审核意见。
+     */
     @PostMapping("/application/review")
     public Result<AttendanceApplication> reviewApplication(
             @RequestParam Long application_id,

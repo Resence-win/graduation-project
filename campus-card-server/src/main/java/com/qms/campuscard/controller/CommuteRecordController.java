@@ -22,6 +22,9 @@ public class CommuteRecordController {
     @Resource
     private LogUtil logUtil;
 
+    /**
+     * 通勤记录列表接口：按校园卡和线路分页查询学生乘车历史。
+     */
     @GetMapping("/list")
     public Result<IPage<CommuteRecord>> getCommuteRecords(
             @RequestParam(required = false) Long cardId,

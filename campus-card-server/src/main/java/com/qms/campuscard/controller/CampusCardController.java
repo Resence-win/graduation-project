@@ -29,6 +29,9 @@ public class CampusCardController {
         this.logUtil = logUtil;
     }
 
+    /**
+     * 校园卡开卡接口：为学生或教师创建校园卡，并同步初始化对应账户。
+     */
     @PostMapping("/card/open")
     public Result<CampusCard> openCard(@RequestBody OpenCardRequest request) {
         try {
@@ -47,6 +50,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 校园卡详情接口：根据校园卡ID查询卡片基础信息和关联用户信息。
+     */
     @GetMapping("/card/{cardId}")
     public Result<CampusCardDTO> getCardById(@PathVariable Long cardId) {
         CampusCardDTO campusCard = campusCardService.getCardById(cardId);
@@ -59,6 +65,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 用户校园卡查询接口：根据学号或教师号及用户类型查询当前绑定的校园卡。
+     */
     @GetMapping("/card/by-user-no/{userNo}/{userType}")
     public Result<CampusCardDTO> getCardByUserNo(@PathVariable String userNo, @PathVariable String userType) {
         CampusCardDTO campusCard = campusCardService.getCardByUserNo(userNo, userType);
@@ -71,6 +80,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 卡号查询接口：根据实体卡号查询校园卡详情，用于充值、消费等场景前置校验。
+     */
     @GetMapping("/card/by-card-no/{cardNo}")
     public Result<CampusCardDTO> getCardByCardNo(@PathVariable String cardNo) {
         CampusCardDTO campusCard = campusCardService.getCardByCardNo(cardNo);
@@ -83,6 +95,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 挂失接口：将校园卡状态改为挂失，阻止后续消费、通行等卡片操作。
+     */
     @PostMapping("/card/loss")
     public Result<Boolean> lossCard(@RequestBody CardOperationRequest request) {
         CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
@@ -96,6 +111,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 解挂接口：将已挂失校园卡恢复为可用状态。
+     */
     @PostMapping("/card/unloss")
     public Result<Boolean> unlossCard(@RequestBody CardOperationRequest request) {
         CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
@@ -109,6 +127,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 注销接口：停用校园卡并记录注销原因，适用于离校、换卡等业务场景。
+     */
     @PostMapping("/card/cancel")
     public Result<Boolean> cancelCard(@RequestBody CardOperationRequest request) {
         CampusCardDTO campusCard = campusCardService.getCardById(request.getCardId());
@@ -134,6 +155,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 账户详情接口：根据卡号查询账户余额、卡片和持卡人相关信息。
+     */
     @GetMapping("/account/by-card-no/{cardNo}")
     public Result<AccountDTO> getAccountByCardNo(@PathVariable String cardNo) {
         AccountDTO account = campusCardService.getAccountDetailByCardNo(cardNo);
@@ -146,6 +170,9 @@ public class CampusCardController {
         }
     }
 
+    /**
+     * 余额查询接口：根据校园卡ID查询当前账户余额。
+     */
     @GetMapping("/account/balance/{cardId}")
     public Result<BigDecimal> getBalance(@PathVariable Long cardId) {
         BigDecimal balance = campusCardService.getBalance(cardId);
@@ -162,6 +189,9 @@ public class CampusCardController {
         return Result.success(records);
     }
 
+    /**
+     * 校园卡分页列表接口：按卡号、状态等条件查询后台卡片管理列表。
+     */
     @GetMapping("/card/list")
     public Result<com.baomidou.mybatisplus.core.metadata.IPage<CampusCardDTO>> getCardList(
             @RequestParam(defaultValue = "1") Integer page,
@@ -175,6 +205,9 @@ public class CampusCardController {
         return Result.success(cardPage);
     }
 
+    /**
+     * 账户流水接口：分页查询指定账户的充值、消费等资金变动记录。
+     */
     @GetMapping("/account/flow")
     public Result<IPage<AccountFlow>> getAccountFlow(
             @RequestParam Long account_id,

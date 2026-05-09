@@ -26,6 +26,9 @@ public class MerchantController {
         this.merchantService = merchantService;
     }
 
+    /**
+     * 新增商户类型接口：维护商户分类，用于商户档案和统计筛选。
+     */
     @PostMapping("/type")
     public Result<Boolean> addMerchantType(@RequestBody MerchantType merchantType) {
         boolean success = merchantService.addMerchantType(merchantType);
@@ -38,6 +41,9 @@ public class MerchantController {
         }
     }
 
+    /**
+     * 商户类型列表接口：查询全部商户分类，供商户表单和筛选条件使用。
+     */
     @GetMapping("/type/list")
     public Result<List<MerchantType>> getMerchantTypeList() {
         List<MerchantType> typeList = merchantService.getMerchantTypeList();
@@ -58,6 +64,9 @@ public class MerchantController {
         }
     }
 
+    /**
+     * 新增商户接口：录入校内商户基础信息，用于消费扣款和商品归属。
+     */
     @PostMapping
     public Result<Boolean> addMerchant(@RequestBody Merchant merchant) {
         boolean success = merchantService.addMerchant(merchant);
@@ -70,6 +79,9 @@ public class MerchantController {
         }
     }
 
+    /**
+     * 商户列表接口：按商户名称和类型分页查询商户档案。
+     */
     @GetMapping("/list")
     public Result<IPage<com.qms.campuscard.dto.MerchantDTO>> getMerchantList(
             @RequestParam(defaultValue = "1") Integer page,
@@ -120,6 +132,9 @@ public class MerchantController {
         }
     }
 
+    /**
+     * 商户Logo上传接口：上传并保存指定商户的展示图片地址。
+     */
     @PostMapping("/upload-logo")
     public Result<String> uploadLogo(@RequestParam("file") MultipartFile file, @RequestParam("merchant_id") Long merchantId) {
         try {

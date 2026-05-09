@@ -31,6 +31,9 @@ public class AccessController {
     }
 
     // 门禁点管理
+    /**
+     * 门禁点列表接口：按名称和状态分页查询门禁点配置。
+     */
     @GetMapping("/point/list")
     public Result<IPage<AccessPoint>> getAccessPoints(
             @RequestParam(required = false) String name,
@@ -42,6 +45,9 @@ public class AccessController {
         return Result.success(points);
     }
 
+    /**
+     * 新增门禁点接口：配置门禁点名称、位置、经纬度和可用状态。
+     */
     @PostMapping("/point")
     public Result<AccessPoint> addAccessPoint(@RequestBody AccessPoint accessPoint) {
         AccessPoint result = accessService.addAccessPoint(accessPoint);
@@ -64,6 +70,9 @@ public class AccessController {
     }
 
     // 门禁记录管理
+    /**
+     * 门禁记录接口：按校园卡、门禁点、时间范围和通行状态分页查询通行记录。
+     */
     @GetMapping("/list")
     public Result<IPage<AccessRecord>> getAccessRecords(
             @RequestParam(required = false) Long card_id,
@@ -86,6 +95,9 @@ public class AccessController {
         return Result.success(records);
     }
 
+    /**
+     * 我的门禁记录接口：学生或教师按自己的校园卡查询个人通行记录。
+     */
     @GetMapping("/my")
     public Result<IPage<AccessRecord>> getMyAccessRecords(
             @RequestParam(required = true) Long card_id,
@@ -95,6 +107,9 @@ public class AccessController {
         return Result.success(records);
     }
 
+    /**
+     * 二维码开门接口：校验二维码、校园卡和门禁点位置后生成通行记录。
+     */
     @PostMapping("/qr")
     public Result<AccessRecord> createQRAccess(
             @RequestParam Long card_id,
@@ -108,6 +123,9 @@ public class AccessController {
         return Result.success(record);
     }
 
+    /**
+     * 门禁统计接口：按时间范围汇总各门禁点或通行状态的数据。
+     */
     @GetMapping("/stat")
     public Result<List<Map<String, Object>>> getAccessStatistics(
             @RequestParam(required = false) String start_date,
@@ -124,6 +142,9 @@ public class AccessController {
         return Result.success(statistics);
     }
 
+    /**
+     * 门禁导出接口：按校园卡和日期范围导出门禁记录CSV文件。
+     */
     @GetMapping("/export")
     public void exportAccessRecords(
             @RequestParam(required = false) Long card_id,

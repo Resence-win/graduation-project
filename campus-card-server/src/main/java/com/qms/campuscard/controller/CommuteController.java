@@ -48,6 +48,9 @@ public class CommuteController {
         }
     }
 
+    /**
+     * 通勤线路列表接口：按线路名称和状态分页查询校车线路。
+     */
     @GetMapping("/route/list")
     public Result<IPage<CommuteRoute>> getRouteList(
             @RequestParam(required = false) String routeName,
@@ -100,6 +103,9 @@ public class CommuteController {
         }
     }
 
+    /**
+     * 通勤车辆列表接口：按车牌号和状态分页查询校车车辆信息。
+     */
     @GetMapping("/vehicle/list")
     public Result<IPage<CommuteVehicle>> getVehicleList(
             @RequestParam(required = false) String plateNumber,
@@ -152,6 +158,9 @@ public class CommuteController {
         }
     }
 
+    /**
+     * 通勤站点列表接口：按站点名称和状态分页查询线路站点。
+     */
     @GetMapping("/station/list")
     public Result<IPage<CommuteStation>> getStationList(
             @RequestParam(required = false) String stationName,
@@ -204,6 +213,9 @@ public class CommuteController {
         }
     }
 
+    /**
+     * 班次列表接口：按线路、车辆和状态分页查询通勤班次安排。
+     */
     @GetMapping("/schedule/list")
     public Result<IPage<CommuteSchedule>> getScheduleList(
             @RequestParam(required = false) Long routeId,
@@ -246,6 +258,9 @@ public class CommuteController {
     }
 
     // 获取所有线路（无分页）
+    /**
+     * 全部线路接口：获取所有可选通勤线路，供下拉选择和学生乘车页面使用。
+     */
     @GetMapping("/route/all")
     public Result<List<CommuteRoute>> getAllRoutes() {
         List<CommuteRoute> routes = commuteRouteService.getAllRoutes();
@@ -254,6 +269,9 @@ public class CommuteController {
     }
 
     // 获取所有车辆（无分页）
+    /**
+     * 全部车辆接口：获取所有车辆信息，供班次配置时选择。
+     */
     @GetMapping("/vehicle/all")
     public Result<List<CommuteVehicle>> getAllVehicles() {
         List<CommuteVehicle> vehicles = commuteVehicleService.getAllVehicles();
@@ -262,6 +280,9 @@ public class CommuteController {
     }
 
     // 获取所有班次（无分页）
+    /**
+     * 全部班次接口：获取所有班次信息，供学生查看和乘车选择。
+     */
     @GetMapping("/schedule/all")
     public Result<List<CommuteSchedule>> getAllSchedules() {
         List<CommuteSchedule> schedules = commuteScheduleService.getAllSchedules();
@@ -270,6 +291,9 @@ public class CommuteController {
     }
 
     // 根据线路ID获取班次列表
+    /**
+     * 线路班次接口：根据线路ID查询该线路下的可用班次。
+     */
     @GetMapping("/schedule/route/{routeId}")
     public Result<List<CommuteSchedule>> getSchedulesByRouteId(@PathVariable Long routeId) {
         List<CommuteSchedule> schedules = commuteScheduleService.getSchedulesByRouteId(routeId);
@@ -278,6 +302,9 @@ public class CommuteController {
     }
     
     // 添加乘车记录
+    /**
+     * 乘车记录接口：学生刷卡或选择班次后生成通勤乘车记录。
+     */
     @PostMapping("/record")
     public Result<String> addCommuteRecord(@RequestBody CommuteRecord record) {
         boolean result = commuteRecordService.addCommuteRecord(record);

@@ -30,6 +30,9 @@ public class BookController {
         this.borrowService = borrowService;
     }
 
+    /**
+     * 图书列表接口：按书名、作者、馆藏位置和状态分页查询图书资源。
+     */
     @GetMapping("/book/list")
     public Result<IPage<Book>> getBookList(
             @RequestParam(required = false) String book_name,
@@ -54,6 +57,9 @@ public class BookController {
         return Result.success("上传成功", logoUrl);
     }
 
+    /**
+     * 直接借阅接口：管理员或后台场景直接生成借阅记录并更新图书库存状态。
+     */
     @PostMapping("/borrow")
     public Result<Boolean> borrowBook(@RequestBody BorrowRequest request) {
         boolean success = borrowService.borrowBook(request.getCardId(), request.getBookId());
@@ -66,6 +72,9 @@ public class BookController {
         }
     }
 
+    /**
+     * 借阅申请接口：学生提交图书借阅申请，等待管理员审批后再正式借出。
+     */
     @PostMapping("/borrow/application")
     public Result<Boolean> submitBorrowApplication(@RequestBody BorrowRequest request) {
         boolean success = borrowService.submitBorrowApplication(request.getCardId(), request.getBookId(), request.getBorrowDays());
@@ -78,6 +87,9 @@ public class BookController {
         }
     }
 
+    /**
+     * 借阅审批接口：管理员审核借阅申请，批准时生成借阅记录，拒绝时保留审批结果。
+     */
     @PostMapping("/borrow/application/approve")
     public Result<Boolean> approveBorrowApplication(
             @RequestParam("application_id") Long applicationId,
@@ -94,6 +106,9 @@ public class BookController {
         }
     }
 
+    /**
+     * 借阅申请列表接口：按卡片、图书和审批状态分页查询借阅申请。
+     */
     @GetMapping("/borrow/application/list")
     public Result<IPage<BorrowApplication>> getBorrowApplications(
             @RequestParam(required = false) Long card_id,
@@ -107,6 +122,9 @@ public class BookController {
         return Result.success(applications);
     }
 
+    /**
+     * 在借数量接口：查询指定校园卡当前未归还的图书数量。
+     */
     @GetMapping("/borrow/active-count")
     public Result<Integer> getActiveBorrowCount(@RequestParam("card_id") Long cardId) {
         int count = borrowService.getActiveBorrowCount(cardId);
@@ -115,6 +133,9 @@ public class BookController {
         return Result.success(count);
     }
 
+    /**
+     * 借阅限制接口：查询指定校园卡是否存在超期、数量上限等借阅限制。
+     */
     @GetMapping("/borrow/restriction-status")
     public Result<BorrowRestrictionStatus> getBorrowRestrictionStatus(@RequestParam("card_id") Long cardId) {
         BorrowRestrictionStatus status = borrowService.getBorrowRestrictionStatus(cardId);
@@ -168,6 +189,9 @@ public class BookController {
         return Result.success(book);
     }
 
+    /**
+     * 图书归还接口：根据借阅记录ID完成还书，并恢复图书可借状态。
+     */
     @PostMapping("/borrow/return")
     public Result<Boolean> returnBook(@RequestParam("borrow_id") Long borrowId) {
         boolean success = borrowService.returnBook(borrowId);
@@ -180,6 +204,9 @@ public class BookController {
         }
     }
 
+    /**
+     * 借阅记录接口：按卡片、图书和归还状态分页查询借阅历史。
+     */
     @GetMapping("/borrow/list")
     public Result<IPage<BorrowRecord>> getBorrowRecords(
             @RequestParam(required = false) Long card_id,

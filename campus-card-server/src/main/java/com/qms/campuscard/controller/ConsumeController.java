@@ -24,6 +24,9 @@ public class ConsumeController {
         this.consumeService = consumeService;
     }
 
+    /**
+     * 消费扣款接口：按校园卡ID和商户ID完成账户扣款并生成消费记录。
+     */
     @PostMapping
     public Result<Boolean> consume(@RequestBody ConsumeRequest request) {
         try {
@@ -42,6 +45,9 @@ public class ConsumeController {
         }
     }
 
+    /**
+     * 卡号消费接口：根据实体卡号完成商户消费扣款。
+     */
     @PostMapping("/by-card-no")
     public Result<Boolean> consumeByCardNo(@RequestBody ConsumeByCardNoRequest request) {
         try {
@@ -60,6 +66,9 @@ public class ConsumeController {
         }
     }
 
+    /**
+     * 商品下单接口：学生按卡号购买商品，系统扣减余额和商品库存。
+     */
     @PostMapping("/product-order")
     public Result<Boolean> consumeProduct(@RequestBody ProductOrderRequest request) {
         try {
@@ -76,6 +85,9 @@ public class ConsumeController {
         }
     }
 
+    /**
+     * 消费记录接口：按卡号、商户和日期范围分页查询消费明细。
+     */
     @GetMapping("/list")
     public Result<IPage<com.qms.campuscard.dto.ConsumeRecordDTO>> getConsumeRecords(
             @RequestParam(required = false) String card_id,

@@ -33,6 +33,9 @@ public class AdminController {
         this.teacherMapper = teacherMapper;
     }
 
+    /**
+     * 用户登录接口：校验账号密码，并根据角色返回用户信息、业务用户ID和校园卡信息。
+     */
     @PostMapping("/login")
     public Result<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
         log.info("登录请求: {}", loginRequest.getUsername());
@@ -101,6 +104,9 @@ public class AdminController {
         return Result.success("登录成功", loginResponse);
     }
     
+    /**
+     * 修改密码接口：登录用户通过旧密码校验后更新自己的登录密码。
+     */
     @PostMapping("/changePassword")
     public Result changePassword(@RequestBody Map<String, String> params) {
         log.info("修改密码请求，参数: {}", params.keySet());
@@ -120,6 +126,9 @@ public class AdminController {
         }
     }
     
+    /**
+     * 重置密码接口：管理员按用户名重置指定用户的登录密码。
+     */
     @PostMapping("/resetPassword")
     public Result resetPassword(@RequestBody Map<String, String> params) {
         log.info("重置密码请求，参数: {}", params.keySet());

@@ -28,6 +28,9 @@ public class StudentController {
         this.studentService = studentService;
     }
 
+    /**
+     * 新增学生接口：录入学生基础信息，并创建对应登录账号。
+     */
     @PostMapping
     public Result<Boolean> addStudent(@RequestBody StudentRequest studentRequest) {
         boolean success = studentService.addStudent(studentRequest);
@@ -40,6 +43,9 @@ public class StudentController {
         }
     }
 
+    /**
+     * 学生列表接口：按学号、姓名等条件分页查询学生档案。
+     */
     @GetMapping("/list")
     public Result<IPage<Student>> getStudentList(
             @RequestParam(defaultValue = "1") Integer page,
@@ -65,6 +71,9 @@ public class StudentController {
         }
     }
     
+    /**
+     * 学号查询接口：根据学号查询学生详情，供登录后绑定业务身份使用。
+     */
     @GetMapping("/by-no/{studentNo}")
     public Result<Student> getStudentByStudentNo(@PathVariable String studentNo) {
         Student student = studentService.getStudentByStudentNo(studentNo);
@@ -103,7 +112,7 @@ public class StudentController {
     }
 
     /**
-     * 导出所有学生信息
+     * 学生导出接口：导出所有学生档案为Excel文件。
      */
     @GetMapping("/export")
     public void exportStudents(jakarta.servlet.http.HttpServletResponse response) {
@@ -118,7 +127,7 @@ public class StudentController {
     }
 
     /**
-     * 批量导入学生信息
+     * 学生导入接口：读取Excel学生名单并批量创建学生档案。
      */
     @PostMapping("/import")
     public Result<Boolean> importStudents(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
@@ -137,6 +146,9 @@ public class StudentController {
         }
     }
 
+    /**
+     * 导入模板接口：下载学生批量导入使用的Excel模板。
+     */
     @GetMapping("/template/download")
     public void downloadImportTemplate(jakarta.servlet.http.HttpServletResponse response) {
         try {

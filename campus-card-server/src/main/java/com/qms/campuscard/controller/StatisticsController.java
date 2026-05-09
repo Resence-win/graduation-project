@@ -20,6 +20,9 @@ public class StatisticsController {
     @Resource
     private LogUtil logUtil;
 
+    /**
+     * 综合统计接口：按时间范围汇总用户、交易、充值等核心运营指标。
+     */
     @GetMapping("/api/stat/overview")
     public Result<Map<String, Object>> getOverview(
             @RequestParam(required = false, defaultValue = "") String start_date,
@@ -29,6 +32,9 @@ public class StatisticsController {
         return Result.success(data);
     }
 
+    /**
+     * 消费趋势接口：按时间范围统计消费金额和消费次数，用于图表展示。
+     */
     @GetMapping("/api/stat/consume")
     public Result<List<Map<String, Object>>> getConsumeStatistics(
             @RequestParam(required = false, defaultValue = "") String start_date,
@@ -39,6 +45,9 @@ public class StatisticsController {
         return Result.success(data);
     }
 
+    /**
+     * 用户消费排行接口：按时间范围查询消费金额靠前的用户。
+     */
     @GetMapping("/api/stat/user-rank")
     public Result<List<Map<String, Object>>> getUserRank(
             @RequestParam(required = false, defaultValue = "") String start_date,
@@ -50,6 +59,9 @@ public class StatisticsController {
         return Result.success(data);
     }
 
+    /**
+     * 商户消费排行接口：按时间范围查询营业额靠前的商户。
+     */
     @GetMapping("/api/stat/merchant-rank")
     public Result<List<Map<String, Object>>> getMerchantRank(
             @RequestParam(required = false, defaultValue = "") String start_date,

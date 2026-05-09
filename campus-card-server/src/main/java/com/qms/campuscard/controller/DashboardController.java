@@ -19,6 +19,9 @@ public class DashboardController {
     @Resource
     private LogUtil logUtil;
 
+    /**
+     * 首页仪表盘接口：汇总学生、教师、商户数量和今日消费金额。
+     */
     @GetMapping("/api/dashboard")
     public Result<Map<String, Object>> getDashboardData() {
         Map<String, Object> data = new HashMap<>();

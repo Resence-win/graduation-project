@@ -6,7 +6,7 @@
           <span>借阅申请管理</span>
         </div>
       </template>
-      
+
       <el-form :inline="true" :model="searchForm">
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
@@ -20,9 +20,9 @@
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-      
+
       <el-table :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="申请ID" width="80" />
+        <el-table-column type="index" label="申请ID" width="80" :index="indexMethod" />
         <el-table-column prop="cardNo" label="校园卡号" width="150" />
         <el-table-column prop="userName" label="借阅人" width="200" />
         <el-table-column prop="bookName" label="图书名称" width="200" />
@@ -43,7 +43,7 @@
           </template>
         </el-table-column>
       </el-table>
-      
+
       <el-pagination
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.size"
@@ -111,7 +111,7 @@ const handleApprove = async (row) => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
+
     const res = await approveBorrowApplication({
       application_id: row.id,
       status: 2,
@@ -135,7 +135,7 @@ const handleReject = async (row) => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
+
     const res = await approveBorrowApplication({
       application_id: row.id,
       status: 3,
@@ -179,6 +179,11 @@ const handleCurrentChange = (val) => {
   pagination.page = val
   loadData()
 }
+
+const indexMethod = (index) => {
+  return (pagination.page - 1) * pagination.size + index + 1
+}
+
 
 onMounted(() => {
   loadData()
