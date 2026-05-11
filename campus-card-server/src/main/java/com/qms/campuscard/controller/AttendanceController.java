@@ -2,6 +2,7 @@ package com.qms.campuscard.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.qms.campuscard.common.Result;
+import com.qms.campuscard.dto.UploadMaterialResponse;
 import com.qms.campuscard.entity.AttendanceApplication;
 import com.qms.campuscard.entity.AttendanceLocation;
 import com.qms.campuscard.entity.AttendanceRecord;
@@ -9,6 +10,7 @@ import com.qms.campuscard.service.AttendanceApplicationService;
 import com.qms.campuscard.service.AttendanceLocationService;
 import com.qms.campuscard.service.AttendanceRecordService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.Resource;
 import java.util.Map;
@@ -168,6 +170,14 @@ public class AttendanceController {
     }
 
     /**
+     * 考勤申报资料上传接口：学生在请假或实习申报富文本中上传图片、PDF、Office文档等佐证资料。
+     */
+    @PostMapping("/application/material/upload")
+    public Result<UploadMaterialResponse> uploadApplicationMaterial(@RequestParam("file") MultipartFile file) {
+        return Result.success("上传成功", attendanceApplicationService.uploadMaterial(file));
+    }
+
+    /**
      * 我的申请接口：按校园卡分页查询当前学生提交的请假或实习申请。
      */
     @GetMapping("/application/my")
@@ -203,5 +213,17 @@ public class AttendanceController {
             @RequestParam(required = false) String reviewer_role,
             @RequestParam(required = false) String review_remark) {
         return Result.success(attendanceApplicationService.reviewApplication(application_id, status, reviewer_id, reviewer_role, review_remark));
+    }
+
+    /**
+     * 实习返校接口：老师或管理员确认学生结束实习，恢复在校考勤。
+     */
+    @PostMapping("/application/internship/return")
+    public Result<AttendanceApplication> returnInternshipApplication(
+            @RequestParam Long application_id,
+            @RequestParam(required = false) Long reviewer_id,
+            @RequestParam(required = false) String reviewer_role,
+            @RequestParam(required = false) String review_remark) {
+        return Result.success(attendanceApplicationService.returnInternshipApplication(application_id, reviewer_id, reviewer_role, review_remark));
     }
 }

@@ -553,7 +553,7 @@ CREATE TABLE attendance_application (
     card_id BIGINT,
     application_type VARCHAR(30),
     internship_company VARCHAR(200),
-    reason VARCHAR(1000),
+    reason TEXT,
     start_date DATE,
     end_date DATE,
     status VARCHAR(20) DEFAULT 'PENDING',
@@ -571,7 +571,7 @@ COMMENT ON COLUMN attendance_application.student_id IS '学生ID';
 COMMENT ON COLUMN attendance_application.card_id IS '卡ID';
 COMMENT ON COLUMN attendance_application.application_type IS '申报类型(INTERNSHIP: 外出实习, LEAVE: 请假)';
 COMMENT ON COLUMN attendance_application.internship_company IS '实习单位';
-COMMENT ON COLUMN attendance_application.reason IS '申报原因或说明';
+COMMENT ON COLUMN attendance_application.reason IS '申报原因、说明或富文本资料内容';
 COMMENT ON COLUMN attendance_application.start_date IS '开始日期';
 COMMENT ON COLUMN attendance_application.end_date IS '结束日期';
 COMMENT ON COLUMN attendance_application.status IS '状态(PENDING: 待审核, APPROVED: 已通过, REJECTED: 已拒绝)';

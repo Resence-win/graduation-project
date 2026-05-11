@@ -343,10 +343,19 @@
                       <el-input v-model="internshipApplicationForm.company" placeholder="请输入实习单位" />
                     </el-form-item>
                     <el-form-item label="开始日期">
-                      <el-date-picker v-model="internshipApplicationForm.startDate" type="date" placeholder="选择开始日期" style="width: 100%" />
+                      <el-date-picker
+                        v-model="internshipApplicationForm.startDate"
+                        type="date"
+                        placeholder="选择开始日期"
+                        :disabled-date="disabledPastDate"
+                        style="width: 100%"
+                      />
                     </el-form-item>
                     <el-form-item label="说明">
-                      <el-input v-model="internshipApplicationForm.reason" type="textarea" :rows="3" placeholder="请填写实习岗位、地点或指导老师要求" />
+                      <RichTextEditor
+                        v-model="internshipApplicationForm.reason"
+                        placeholder="请填写实习岗位、地点、指导老师要求，或上传相关资料"
+                      />
                     </el-form-item>
                     <el-form-item>
                       <el-button
@@ -369,11 +378,15 @@
                         range-separator="至"
                         start-placeholder="开始日期"
                         end-placeholder="结束日期"
+                        :disabled-date="disabledPastDate"
                         style="width: 100%"
                       />
                     </el-form-item>
                     <el-form-item label="请假原因">
-                      <el-input v-model="leaveApplicationForm.reason" type="textarea" :rows="3" placeholder="请输入请假原因" />
+                      <RichTextEditor
+                        v-model="leaveApplicationForm.reason"
+                        placeholder="请输入请假原因，或上传证明资料"
+                      />
                     </el-form-item>
                     <el-form-item v-if="hasOverlappingLeaveApplication">
                       <el-alert
@@ -407,7 +420,20 @@
                     {{ row.startDate || '-' }}<span v-if="row.endDate"> 至 {{ row.endDate }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column prop="reason" label="说明" show-overflow-tooltip />
+                <el-table-column label="说明/资料" min-width="120">
+                  <template #default="{ row }">
+                    <el-button
+                      v-if="hasRichTextContent(row.reason)"
+                      size="small"
+                      link
+                      type="primary"
+                      @click="openApplicationReason(row)"
+                    >
+                      查看
+                    </el-button>
+                    <span v-else>未填写</span>
+                  </template>
+                </el-table-column>
                 <el-table-column label="状态" width="100">
                   <template #default="{ row }">
                     <el-tag :type="getApplicationStatusType(row.status)">
@@ -416,6 +442,9 @@
                   </template>
                 </el-table-column>
               </el-table>
+              <el-dialog v-model="applicationReasonDialogVisible" title="申报说明/资料" width="640px">
+                <RichTextPreview :html="currentApplicationReason" />
+              </el-dialog>
             </el-card>
 
             <el-card shadow="hover" class="attendance-card">
@@ -838,6 +867,8 @@ import { getAttendanceList, createAttendance, getActiveLocations, submitInternsh
 import { getRechargeList, recharge, rechargeByCardNo } from '@/api/recharge'
 import { changePassword } from '@/api/admin'
 import { getCollegeMajorOptions } from '@/api/collegeMajor'
+import RichTextEditor from '@/components/RichTextEditor.vue'
+import RichTextPreview from '@/components/RichTextPreview.vue'
 
 const router = useRouter()
 
@@ -1626,6 +1657,8 @@ const leaveApplicationForm = reactive({
 const attendanceApplications = ref([])
 const submittingInternshipApplication = ref(false)
 const submittingLeaveApplication = ref(false)
+const applicationReasonDialogVisible = ref(false)
+const currentApplicationReason = ref('')
 const hasActiveInternshipApplication = computed(() => {
   return attendanceApplications.value.some(app => {
     return app.applicationType === 'INTERNSHIP' && ['PENDING', 'APPROVED'].includes(app.status)
@@ -1886,6 +1919,40 @@ const formatDateValue = (value) => {
   return value ? new Date(value).toISOString().split('T')[0] : ''
 }
 
+const getTodayStart = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+const isBeforeToday = (value) => {
+  if (!value) {
+    return false
+  }
+  const date = new Date(value)
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  return dateStart.getTime() < getTodayStart().getTime()
+}
+
+const disabledPastDate = (time) => {
+  return isBeforeToday(time)
+}
+
+const getPlainTextFromHtml = (html) => {
+  return String(html || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim()
+}
+
+const hasRichTextContent = (html) => {
+  return /<(img|a)\b/i.test(html || '') || !!getPlainTextFromHtml(html)
+}
+
+const openApplicationReason = (row) => {
+  currentApplicationReason.value = row.reason || '<p>未填写</p>'
+  applicationReasonDialogVisible.value = true
+}
+
 const handleSubmitInternshipApplication = async () => {
   if (!cardInfo.id) {
     ElMessage.error('请先加载校园卡信息')
@@ -1897,6 +1964,14 @@ const handleSubmitInternshipApplication = async () => {
   }
   if (!internshipApplicationForm.company) {
     ElMessage.error('请输入实习单位')
+    return
+  }
+  if (!internshipApplicationForm.startDate) {
+    ElMessage.error('请选择开始日期')
+    return
+  }
+  if (isBeforeToday(internshipApplicationForm.startDate)) {
+    ElMessage.error('开始日期不能早于今天')
     return
   }
   try {
@@ -1936,12 +2011,16 @@ const handleSubmitLeaveApplication = async () => {
   }
   const startDate = new Date(leaveApplicationForm.dateRange[0])
   const endDate = new Date(leaveApplicationForm.dateRange[1])
+  if (isBeforeToday(startDate)) {
+    ElMessage.error('请假开始日期不能早于今天')
+    return
+  }
   const leaveDays = Math.floor((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1
   if (leaveDays < 1 || leaveDays > 3) {
     ElMessage.warning('线上请假仅支持1-3天，超过3天请走线下流程办理')
     return
   }
-  if (!leaveApplicationForm.reason) {
+  if (!hasRichTextContent(leaveApplicationForm.reason)) {
     ElMessage.error('请输入请假原因')
     return
   }

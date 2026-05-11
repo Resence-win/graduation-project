@@ -26,6 +26,14 @@ export const submitLeaveApplication = (data) => {
   return request.post('/attendance/application/leave', data)
 }
 
+export const uploadAttendanceApplicationMaterial = (formData) => {
+  return request.post('/attendance/application/material/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
 export const getMyAttendanceApplications = (params) => {
   return request.get('/attendance/application/my', { params })
 }
@@ -36,6 +44,10 @@ export const getAttendanceApplications = (params) => {
 
 export const reviewAttendanceApplication = (params) => {
   return request.post('/attendance/application/review', null, { params })
+}
+
+export const returnInternshipApplication = (params) => {
+  return request.post('/attendance/application/internship/return', null, { params })
 }
 
 // 打卡位置相关接口

@@ -43,7 +43,20 @@
           </template>
         </el-table-column>
         <el-table-column prop="internshipCompany" label="实习单位" width="160" show-overflow-tooltip />
-        <el-table-column prop="reason" label="说明" min-width="220" show-overflow-tooltip />
+        <el-table-column label="说明/资料" min-width="120">
+          <template #default="{ row }">
+            <el-button
+              v-if="hasRichTextContent(row.reason)"
+              size="small"
+              link
+              type="primary"
+              @click="openReasonDialog(row)"
+            >
+              查看
+            </el-button>
+            <span v-else>未填写</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="createTime" label="申请时间" width="180" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -54,10 +67,18 @@
         </el-table-column>
         <el-table-column prop="reviewRemark" label="审核备注" min-width="160" show-overflow-tooltip />
         <el-table-column prop="reviewTime" label="审核时间" width="180" />
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" @click="handleReview(row, 'APPROVED')" :disabled="row.status !== 'PENDING'">通过</el-button>
             <el-button size="small" type="danger" @click="handleReview(row, 'REJECTED')" :disabled="row.status !== 'PENDING'">拒绝</el-button>
+            <el-button
+              size="small"
+              type="warning"
+              @click="handleReturnInternship(row)"
+              :disabled="!canReturnInternship(row)"
+            >
+              结束实习
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -72,6 +93,10 @@
         @current-change="handleCurrentChange"
         style="margin-top: 20px; justify-content: flex-end"
       />
+
+      <el-dialog v-model="reasonDialogVisible" title="申报说明/资料" width="640px">
+        <RichTextPreview :html="currentReason" />
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -79,9 +104,12 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAttendanceApplications, reviewAttendanceApplication } from '@/api/attendance'
+import { getAttendanceApplications, reviewAttendanceApplication, returnInternshipApplication } from '@/api/attendance'
+import RichTextPreview from '@/components/RichTextPreview.vue'
 
 const tableData = ref([])
+const reasonDialogVisible = ref(false)
+const currentReason = ref('')
 
 const searchForm = reactive({
   applicationType: '',
@@ -143,6 +171,61 @@ const handleReview = async (row, status) => {
       ElMessage.error(error.response?.data?.msg || `${actionText}失败`)
     }
   }
+}
+
+const canReturnInternship = (row) => {
+  return row.applicationType === 'INTERNSHIP'
+    && row.status === 'APPROVED'
+    && !isInternshipReturned(row)
+}
+
+const isInternshipReturned = (row) => {
+  return /已结束实习|已返校/.test(row.reviewRemark || '')
+}
+
+const handleReturnInternship = async (row) => {
+  try {
+    const { value } = await ElMessageBox.prompt('确定该学生已结束实习并返校吗？', '结束实习确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPlaceholder: '可填写返校备注',
+      inputType: 'textarea'
+    })
+
+    const res = await returnInternshipApplication({
+      application_id: row.id,
+      reviewer_id: getCurrentUserId(),
+      reviewer_role: currentUser.value.role,
+      review_remark: value || ''
+    })
+    if (res.code === 0) {
+      ElMessage.success('已结束实习，学生恢复在校考勤')
+      loadData()
+    } else {
+      ElMessage.error(res.msg || '结束实习失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('结束实习失败:', error)
+      ElMessage.error(error.response?.data?.msg || '结束实习失败')
+    }
+  }
+}
+
+const getPlainTextFromHtml = (html) => {
+  return String(html || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim()
+}
+
+const hasRichTextContent = (html) => {
+  return /<(img|a)\b/i.test(html || '') || !!getPlainTextFromHtml(html)
+}
+
+const openReasonDialog = (row) => {
+  currentReason.value = row.reason || '<p>未填写</p>'
+  reasonDialogVisible.value = true
 }
 
 const handleSearch = () => {
@@ -232,4 +315,5 @@ onMounted(() => {
 .el-pagination {
   display: flex;
 }
+
 </style>

@@ -12,7 +12,9 @@ import com.qms.campuscard.entity.Teacher;
 import com.qms.campuscard.mapper.AdminUserMapper;
 import com.qms.campuscard.mapper.StudentMapper;
 import com.qms.campuscard.mapper.TeacherMapper;
+import com.qms.campuscard.service.AttendanceApplicationService;
 import com.qms.campuscard.service.StudentService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
@@ -32,6 +34,10 @@ public class StudentServiceImpl implements StudentService {
 
     @Resource
     private TeacherMapper teacherMapper;
+
+    @Resource
+    @Lazy
+    private AttendanceApplicationService attendanceApplicationService;
 
     @Override
     public boolean addStudent(Student student) {
@@ -120,6 +126,7 @@ public class StudentServiceImpl implements StudentService {
         
         queryWrapper.orderByDesc("create_time");
         IPage<Student> result = studentMapper.selectPage(page, queryWrapper);
+        refreshLeaveStatus(result.getRecords());
         fillTeacherName(result.getRecords());
         return result;
     }
@@ -130,6 +137,7 @@ public class StudentServiceImpl implements StudentService {
         queryWrapper.eq("id", id);
         queryWrapper.eq("is_deleted", 0);
         Student student = studentMapper.selectOne(queryWrapper);
+        refreshLeaveStatus(student);
         fillTeacherName(student);
         return student;
     }
@@ -140,6 +148,7 @@ public class StudentServiceImpl implements StudentService {
         queryWrapper.eq("student_no", studentNo);
         queryWrapper.eq("is_deleted", 0);
         Student student = studentMapper.selectOne(queryWrapper);
+        refreshLeaveStatus(student);
         fillTeacherName(student);
         return student;
     }
@@ -178,6 +187,26 @@ public class StudentServiceImpl implements StudentService {
         }
         for (Student student : students) {
             fillTeacherName(student);
+        }
+    }
+
+    private void refreshLeaveStatus(List<Student> students) {
+        if (students == null || students.isEmpty()) {
+            return;
+        }
+        for (Student student : students) {
+            refreshLeaveStatus(student);
+        }
+    }
+
+    private void refreshLeaveStatus(Student student) {
+        if (student != null && student.getId() != null) {
+            attendanceApplicationService.refreshLeaveStatusByStudentId(student.getId());
+            Student refreshedStudent = studentMapper.selectById(student.getId());
+            if (refreshedStudent != null) {
+                student.setAttendanceStatus(refreshedStudent.getAttendanceStatus());
+                student.setUpdateTime(refreshedStudent.getUpdateTime());
+            }
         }
     }
 
