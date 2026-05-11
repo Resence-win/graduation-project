@@ -8,6 +8,15 @@
         </div>
       </template>
 
+      <el-alert
+        v-if="!studentProfileComplete"
+        :title="studentProfileIncompleteMessage"
+        type="warning"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 16px"
+      />
+
       <el-form :inline="true" :model="searchForm">
         <el-form-item label="商品名称">
           <el-input v-model="searchForm.productName" placeholder="请输入商品名称" clearable />
@@ -37,7 +46,7 @@
               <span class="price">¥{{ product.price }}</span>
               <span class="stock">库存 {{ product.stock }}</span>
             </div>
-            <el-button type="primary" style="width: 100%; margin-top: 12px" :disabled="product.stock <= 0" @click="handleBuy(product)">
+            <el-button type="primary" style="width: 100%; margin-top: 12px" :disabled="product.stock <= 0 || !studentProfileComplete" @click="handleBuy(product)">
               {{ product.stock > 0 ? '购买' : '已售罄' }}
             </el-button>
           </el-card>
@@ -93,12 +102,22 @@ import { ElMessage } from 'element-plus'
 import { getMerchantList } from '@/api/merchant'
 import { getProductList, orderProduct } from '@/api/product'
 import { getCardByUserNo } from '@/api/card'
+import { getStudentByNo } from '@/api/student'
 
 const productList = ref([])
 const merchantList = ref([])
 const orderDialogVisible = ref(false)
 const currentProduct = ref(null)
 const ordering = ref(false)
+const studentInfo = ref(null)
+const studentProfileIncompleteMessage = '请先在个人中心完善姓名、性别、学院、专业、班级、手机号后再进行该操作'
+
+const studentProfileComplete = computed(() => {
+  if (!studentInfo.value) {
+    return false
+  }
+  return Boolean(studentInfo.value.name && studentInfo.value.gender && studentInfo.value.college && studentInfo.value.major && studentInfo.value.className && studentInfo.value.phone && /^1[3-9]\d{9}$/.test(studentInfo.value.phone))
+})
 
 const searchForm = reactive({
   productName: '',
@@ -137,6 +156,16 @@ const loadCardInfo = async () => {
   }
 }
 
+const loadStudentInfo = async () => {
+  const userStr = localStorage.getItem('user')
+  const user = userStr ? JSON.parse(userStr) : null
+  if (!user?.username) return
+  const res = await getStudentByNo(user.username)
+  if (res.code === 0) {
+    studentInfo.value = res.data
+  }
+}
+
 const loadProducts = async () => {
   const res = await getProductList({
     page: pagination.page,
@@ -170,6 +199,10 @@ const handleReset = () => {
 }
 
 const handleBuy = (product) => {
+  if (!studentProfileComplete.value) {
+    ElMessage.warning(studentProfileIncompleteMessage)
+    return
+  }
   if (!cardInfo.cardNo) {
     ElMessage.warning('当前账号未绑定校园卡')
     return
@@ -214,6 +247,7 @@ const handleCurrentChange = (val) => {
 }
 
 onMounted(() => {
+  loadStudentInfo()
   loadCardInfo()
   loadMerchants()
   loadProducts()

@@ -23,6 +23,43 @@
                 <el-option label="女" value="女" />
               </el-select>
             </el-form-item>
+            <template v-if="userInfo.role === 'student'">
+              <el-form-item label="学院" required>
+                <el-select
+                  v-model="userInfo.college"
+                  placeholder="请选择学院"
+                  filterable
+                  style="width: 100%"
+                  @change="handleProfileCollegeChange"
+                >
+                  <el-option
+                    v-for="college in collegeOptions"
+                    :key="college"
+                    :label="college"
+                    :value="college"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="专业" required>
+                <el-select
+                  v-model="userInfo.major"
+                  placeholder="请选择专业"
+                  filterable
+                  style="width: 100%"
+                  :disabled="!userInfo.college"
+                >
+                  <el-option
+                    v-for="major in profileMajorOptions"
+                    :key="major"
+                    :label="major"
+                    :value="major"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="班级" required>
+                <el-input v-model="userInfo.className" placeholder="请输入班级" />
+              </el-form-item>
+            </template>
             <el-form-item label="性别" v-else>
               <el-select v-model="userInfo.gender" placeholder="请选择性别">
                 <el-option label="男" value="男" />
@@ -106,6 +143,14 @@
         
         <el-tab-pane label="图书借阅" name="book" v-if="userInfo.role === 'student'">
           <el-alert
+            v-if="!studentProfileComplete"
+            :title="studentProfileIncompleteMessage"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="borrow-warning"
+          />
+          <el-alert
             v-if="borrowRestriction.restricted"
             :title="borrowRestriction.message"
             type="warning"
@@ -158,8 +203,8 @@
                   <el-button size="small" type="info" disabled>申请中</el-button>
                 </template>
                 <template v-else>
-                  <el-button size="small" type="primary" @click="handleBorrow(row)" :disabled="row.status !== 1 || borrowRestriction.restricted">
-                    {{ borrowRestriction.restricted ? '暂不可借' : '借阅' }}
+                  <el-button size="small" type="primary" @click="handleBorrow(row)" :disabled="row.status !== 1 || borrowRestriction.restricted || !studentProfileComplete">
+                    {{ !studentProfileComplete ? '资料未完善' : borrowRestriction.restricted ? '暂不可借' : '借阅' }}
                   </el-button>
                 </template>
               </template>
@@ -277,6 +322,14 @@
         
         <el-tab-pane label="考勤打卡" name="attendance">
           <div class="attendance-section">
+            <el-alert
+              v-if="userInfo.role === 'student' && !studentProfileComplete"
+              :title="studentProfileIncompleteMessage"
+              type="warning"
+              show-icon
+              :closable="false"
+              style="margin-bottom: 20px"
+            />
             <el-card shadow="hover" class="attendance-card">
               <template #header>
                 <div class="card-header">
@@ -299,7 +352,7 @@
                       <el-button
                         type="primary"
                         @click="handleSubmitInternshipApplication"
-                        :disabled="hasActiveInternshipApplication || submittingInternshipApplication"
+                        :disabled="!studentProfileComplete || hasActiveInternshipApplication || submittingInternshipApplication"
                         :loading="submittingInternshipApplication"
                       >
                         提交实习申报
@@ -334,7 +387,7 @@
                       <el-button
                         type="primary"
                         @click="handleSubmitLeaveApplication"
-                        :disabled="hasOverlappingLeaveApplication || submittingLeaveApplication"
+                        :disabled="!studentProfileComplete || hasOverlappingLeaveApplication || submittingLeaveApplication"
                         :loading="submittingLeaveApplication"
                       >
                         提交请假申请
@@ -698,7 +751,7 @@
         <template #footer>
           <span class="dialog-footer">
             <el-button @click="borrowDialogVisible = false">取消</el-button>
-            <el-button type="primary" @click="handleSubmitBorrowApplication">提交申请</el-button>
+            <el-button type="primary" :disabled="!studentProfileComplete" @click="handleSubmitBorrowApplication">提交申请</el-button>
           </span>
         </template>
       </el-dialog>
@@ -784,6 +837,7 @@ import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/acces
 import { getAttendanceList, createAttendance, getActiveLocations, submitInternshipApplication, submitLeaveApplication, getMyAttendanceApplications } from '@/api/attendance'
 import { getRechargeList, recharge, rechargeByCardNo } from '@/api/recharge'
 import { changePassword } from '@/api/admin'
+import { getCollegeMajorOptions } from '@/api/collegeMajor'
 
 const router = useRouter()
 
@@ -793,6 +847,9 @@ const userInfo = reactive({
   name: '',
   username: '',
   gender: '',
+  college: '',
+  major: '',
+  className: '',
   phone: '',
   email: '',
   attendanceMode: 'CAMPUS',
@@ -806,6 +863,32 @@ const cardInfo = reactive({
   balance: '0.00',
   createTime: ''
 })
+
+const collegeMajorOptions = ref({})
+const studentProfileIncompleteMessage = '请先在个人信息中完善姓名、性别、学院、专业、班级、手机号后再进行该操作'
+const studentProfileComplete = computed(() => {
+  if (userInfo.role !== 'student') {
+    return true
+  }
+  return Boolean(userInfo.name && userInfo.gender && userInfo.college && userInfo.major && userInfo.className && userInfo.phone && /^1[3-9]\d{9}$/.test(userInfo.phone))
+})
+const collegeOptions = computed(() => Object.keys(collegeMajorOptions.value))
+const profileMajorOptions = computed(() => collegeMajorOptions.value[userInfo.college] || [])
+
+const loadCollegeMajorOptions = async () => {
+  try {
+    const res = await getCollegeMajorOptions()
+    if (res.code === 0) {
+      collegeMajorOptions.value = res.data || {}
+    }
+  } catch (error) {
+    console.error('加载学院专业失败:', error)
+  }
+}
+
+const handleProfileCollegeChange = () => {
+  userInfo.major = ''
+}
 
 // 密码修改表单
 const passwordForm = reactive({
@@ -1142,6 +1225,10 @@ const handleBookCurrentChange = (val) => {
 }
 
 const handleBorrow = (book) => {
+  if (!studentProfileComplete.value) {
+    ElMessage.warning(studentProfileIncompleteMessage)
+    return
+  }
   if (borrowRestriction.restricted) {
     ElMessage.warning(borrowRestriction.message || '当前存在逾期或禁借限制，暂时不能借阅图书')
     return
@@ -1154,6 +1241,10 @@ const handleSubmitBorrowApplication = async () => {
   try {
     if (!cardInfo.id || !currentBook.value) {
       ElMessage.error('请先加载校园卡信息')
+      return
+    }
+    if (!studentProfileComplete.value) {
+      ElMessage.warning(studentProfileIncompleteMessage)
       return
     }
 
@@ -1494,6 +1585,9 @@ const checkingIn = ref(false)
 const isInternshipAttendance = computed(() => userInfo.role === 'student' && userInfo.attendanceMode === 'INTERNSHIP')
 const isLeaveAttendance = computed(() => userInfo.role === 'student' && userInfo.attendanceStatus === 'LEAVE')
 const canSubmitAttendance = computed(() => {
+  if (!studentProfileComplete.value) {
+    return false
+  }
   if (!currentLocation.value || !currentLatitude.value || !currentLongitude.value) {
     return false
   }
@@ -1625,6 +1719,11 @@ const getCurrentLocation = () => {
 const handleCheckin = async () => {
   if (!cardInfo.id) {
     ElMessage.error('请先加载校园卡信息')
+    return
+  }
+
+  if (!studentProfileComplete.value) {
+    ElMessage.warning(studentProfileIncompleteMessage)
     return
   }
   
@@ -1792,6 +1891,10 @@ const handleSubmitInternshipApplication = async () => {
     ElMessage.error('请先加载校园卡信息')
     return
   }
+  if (!studentProfileComplete.value) {
+    ElMessage.warning(studentProfileIncompleteMessage)
+    return
+  }
   if (!internshipApplicationForm.company) {
     ElMessage.error('请输入实习单位')
     return
@@ -1821,6 +1924,10 @@ const handleSubmitInternshipApplication = async () => {
 const handleSubmitLeaveApplication = async () => {
   if (!cardInfo.id) {
     ElMessage.error('请先加载校园卡信息')
+    return
+  }
+  if (!studentProfileComplete.value) {
+    ElMessage.warning(studentProfileIncompleteMessage)
     return
   }
   if (!leaveApplicationForm.dateRange || leaveApplicationForm.dateRange.length !== 2) {
@@ -1932,6 +2039,11 @@ const handleChangePassword = async () => {
 
 const handleUpdateProfile = async () => {
   try {
+    if (userInfo.role === 'student' && (!userInfo.name || !userInfo.gender || !userInfo.college || !userInfo.major || !userInfo.className || !userInfo.phone)) {
+      ElMessage.error('请填写姓名、性别、学院、专业、班级、手机号')
+      return
+    }
+
     // 验证手机号格式
     if (userInfo.phone && !/^1[3-9]\d{9}$/.test(userInfo.phone)) {
       ElMessage.error('请输入正确的手机号')
@@ -2146,6 +2258,7 @@ watch(() => showQRCodeDialog.value, (newVal) => {
 })
 
 onMounted(async () => {
+  await loadCollegeMajorOptions()
   await loadUserInfo()
   await loadCardInfo()
   loadConsumeData()

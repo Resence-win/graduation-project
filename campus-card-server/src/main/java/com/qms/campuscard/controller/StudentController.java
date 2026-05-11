@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
+import com.qms.campuscard.dto.StudentImportResult;
 import com.qms.campuscard.dto.StudentRequest;
 import com.qms.campuscard.entity.Student;
+import com.qms.campuscard.service.CollegeMajorService;
 import com.qms.campuscard.service.StudentService;
 import com.qms.campuscard.util.ExcelUtil;
 
@@ -20,12 +22,14 @@ import jakarta.annotation.Resource;
 public class StudentController {
 
     private final StudentService studentService;
+    private final CollegeMajorService collegeMajorService;
 
     @Resource
     private LogUtil logUtil;
 
-    public StudentController(StudentService studentService) {
+    public StudentController(StudentService studentService, CollegeMajorService collegeMajorService) {
         this.studentService = studentService;
+        this.collegeMajorService = collegeMajorService;
     }
 
     /**
@@ -130,16 +134,16 @@ public class StudentController {
      * 学生导入接口：读取Excel学生名单并批量创建学生档案。
      */
     @PostMapping("/import")
-    public Result<Boolean> importStudents(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+    public Result<StudentImportResult> importStudents(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
         try {
             List<Student> students = ExcelUtil.importStudentsSimple(file.getInputStream());
-            boolean success = studentService.batchImportStudents(students);
-            if (success) {
-                logUtil.recordLog(1L, "导入", "student", null, "导入学生信息，共" + students.size() + "条");
-                return Result.success("导入成功", true);
-            } else {
-                return Result.error("导入失败");
-            }
+            StudentImportResult importResult = studentService.batchImportStudents(students);
+            logUtil.recordLog(1L, "导入", "student", null,
+                    "导入学生信息，总数：" + importResult.getTotalCount()
+                            + "，成功：" + importResult.getSuccessCount()
+                            + "，跳过：" + importResult.getSkippedCount()
+                            + "，失败：" + importResult.getFailedCount());
+            return Result.success("导入完成", importResult);
         } catch (Exception e) {
             e.printStackTrace();
             return Result.error("导入失败：" + e.getMessage());
@@ -152,7 +156,7 @@ public class StudentController {
     @GetMapping("/template/download")
     public void downloadImportTemplate(jakarta.servlet.http.HttpServletResponse response) {
         try {
-            ExcelUtil.downloadImportTemplate(response);
+            ExcelUtil.downloadImportTemplate(response, collegeMajorService.getCollegeMajorOptions());
             logUtil.recordLog(1L, "下载", "student", null, "下载学生导入模板");
         } catch (Exception e) {
             e.printStackTrace();

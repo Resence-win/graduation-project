@@ -14,6 +14,7 @@ import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.StudentMapper;
 import com.qms.campuscard.service.AttendanceLocationService;
 import com.qms.campuscard.service.AttendanceRecordService;
+import com.qms.campuscard.service.StudentService;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
@@ -39,6 +40,9 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
 
     @Resource
     private AttendanceApplicationMapper attendanceApplicationMapper;
+
+    @Resource
+    private StudentService studentService;
 
     @Override
     public IPage<AttendanceRecord> getAttendanceRecords(Long cardId, String status, String startDate, String endDate, Integer page, Integer size) {
@@ -84,6 +88,7 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         if (campusCard.getStatus() == null || campusCard.getStatus() != 1) {
             throw new RuntimeException("校园卡状态异常，无法打卡");
         }
+        studentService.ensureStudentProfileCompleteByCard(campusCard);
 
         String studentAttendanceMode = "CAMPUS";
         String studentAttendanceStatus = "ON_CAMPUS";

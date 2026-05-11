@@ -4,19 +4,29 @@
       <template #header>
         <div class="card-header">
           <span>校园卡管理</span>
-          <el-button type="primary" @click="handleOpen">开卡</el-button>
+          <div class="header-actions">
+            <el-button type="success" :disabled="selectedRows.length === 0" @click="handleBatchOpen">
+              批量开卡
+            </el-button>
+            <el-button type="primary" @click="handleOpen()">开卡</el-button>
+          </div>
         </div>
       </template>
       
       <el-form :inline="true" :model="searchForm">
-        <el-form-item label="卡号">
-          <el-input v-model="searchForm.cardNo" placeholder="请输入卡号" clearable />
+        <el-form-item :label="searchForm.status === -1 ? '人员编号' : '卡号'">
+          <el-input
+            v-model="searchForm.cardNo"
+            :placeholder="searchForm.status === -1 ? '请输入学号、教师编号或姓名' : '请输入卡号'"
+            clearable
+          />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
             <el-option label="正常" :value="1" />
             <el-option label="挂失" :value="2" />
             <el-option label="注销" :value="0" />
+            <el-option label="未开卡" :value="-1" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -25,13 +35,24 @@
         </el-form-item>
       </el-form>
       
-      <el-table :data="tableData" border style="width: 100%">
+      <el-table
+        :data="tableData"
+        border
+        style="width: 100%"
+        :row-key="getRowKey"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="50" :selectable="isRowSelectable" />
         <el-table-column label="ID" width="80">
           <template #default="{ $index }">
             {{ $index + 1 }}
           </template>
         </el-table-column>
-        <el-table-column prop="cardNo" label="卡号" width="150" />
+        <el-table-column prop="cardNo" label="卡号" width="150">
+          <template #default="{ row }">
+            {{ row.cardNo || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="userNo" label="学号/教师编号" width="150" />
         <el-table-column prop="userName" label="姓名" width="120" />
         <el-table-column prop="userType" label="用户类型" width="100">
@@ -52,7 +73,15 @@
         <el-table-column prop="expireDate" label="过期日期" width="120" />
         <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="handleView(row)">查看</el-button>
+            <el-button v-if="row.status !== -1" size="small" @click="handleView(row)">查看</el-button>
+            <el-button
+              v-if="row.status === -1"
+              size="small"
+              type="primary"
+              @click="handleOpen(row)"
+            >
+              开卡
+            </el-button>
             <el-button
               v-if="row.status === 1"
               size="small"
@@ -70,7 +99,7 @@
               解挂
             </el-button>
             <el-button
-              v-if="row.status !== 0"
+              v-if="row.status !== 0 && row.status !== -1"
               size="small"
               type="danger"
               @click="handleCancel(row)"
@@ -120,6 +149,31 @@
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="batchDialogVisible"
+      title="批量开卡"
+      width="500px"
+    >
+      <el-form :model="batchForm" ref="batchFormRef" label-width="100px">
+        <el-form-item label="开卡人数">
+          <span>{{ selectedRows.length }} 人</span>
+        </el-form-item>
+        <el-form-item label="开卡原因" prop="remark">
+          <el-select v-model="batchForm.remark" placeholder="请选择开卡原因" style="width: 100%">
+            <el-option label="批量开卡" value="批量开卡" />
+            <el-option label="新生入校" value="新生入校" />
+            <el-option label="教师入职" value="教师入职" />
+            <el-option label="补办新卡" value="补办新卡" />
+            <el-option label="其他原因" value="其他原因" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleBatchSubmit">确定开卡</el-button>
       </template>
     </el-dialog>
     
@@ -195,13 +249,16 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCardList, openCard, getCardInfo, lossCard, unlossCard, cancelCard } from '@/api/card'
+import { getCardList, openCard, batchOpenCard, getCardInfo, lossCard, unlossCard, cancelCard } from '@/api/card'
 
 const formRef = ref(null)
 const operationFormRef = ref(null)
+const batchFormRef = ref(null)
 const dialogVisible = ref(false)
+const batchDialogVisible = ref(false)
 const operationDialogVisible = ref(false)
 const tableData = ref([])
+const selectedRows = ref([])
 
 const searchForm = reactive({
   cardNo: '',
@@ -218,6 +275,10 @@ const form = reactive({
   userNo: '',
   userType: 'student',
   remark: ''
+})
+
+const batchForm = reactive({
+  remark: '批量开卡'
 })
 
 const operationForm = reactive({
@@ -242,6 +303,7 @@ const rules = {
 
 const getStatusType = (status) => {
   const map = {
+    '-1': 'info',
     0: 'danger',
     1: 'success',
     2: 'warning'
@@ -251,6 +313,7 @@ const getStatusType = (status) => {
 
 const getStatusText = (status) => {
   const map = {
+    '-1': '未开卡',
     0: '注销',
     1: '正常',
     2: '挂失'
@@ -260,6 +323,7 @@ const getStatusText = (status) => {
 
 const loadData = async () => {
   try {
+    selectedRows.value = []
     const res = await getCardList({
       page: pagination.page,
       size: pagination.size,
@@ -285,11 +349,24 @@ const handleReset = () => {
   loadData()
 }
 
-const handleOpen = () => {
+const getRowKey = (row) => {
+  return row.id ? `card-${row.id}` : `${row.userType}-${row.userId}`
+}
+
+const isRowSelectable = (row) => {
+  return row.status === -1
+}
+
+const handleSelectionChange = (rows) => {
+  selectedRows.value = rows.filter(row => row.status === -1)
+}
+
+const handleOpen = (row) => {
   dialogVisible.value = true
   Object.assign(form, {
-    userNo: '',
-    userType: 'student'
+    userNo: row?.userNo || '',
+    userType: row?.userType || 'student',
+    remark: ''
   })
 }
 
@@ -339,6 +416,50 @@ const handleCancel = async (row) => {
   operationForm.cardId = row.id
   operationForm.remark = ''
   operationDialogVisible.value = true
+}
+
+const handleBatchOpen = () => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先勾选未开卡人员')
+    return
+  }
+  batchForm.remark = '批量开卡'
+  batchDialogVisible.value = true
+}
+
+const handleBatchSubmit = async () => {
+  if (!batchForm.remark) {
+    ElMessage.error('请选择开卡原因')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定为选中的 ${selectedRows.value.length} 位未开卡人员批量开卡吗？`,
+      '批量开卡确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    const res = await batchOpenCard({
+      users: selectedRows.value.map(row => ({
+        user_no: row.userNo,
+        user_type: row.userType
+      })),
+      remark: batchForm.remark
+    })
+    if (res.code === 0) {
+      const successCount = res.data?.successCount || selectedRows.value.length
+      ElMessage.success(`批量开卡成功，共开卡 ${successCount} 人`)
+      batchDialogVisible.value = false
+      loadData()
+    }
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('批量开卡失败:', error)
+    }
+  }
 }
 
 const handleOperationSubmit = async () => {
@@ -428,6 +549,11 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .el-pagination {

@@ -18,6 +18,7 @@ import com.qms.campuscard.mapper.ConsumeRecordMapper;
 import com.qms.campuscard.mapper.MerchantMapper;
 import com.qms.campuscard.mapper.ProductMapper;
 import com.qms.campuscard.service.ConsumeService;
+import com.qms.campuscard.service.StudentService;
 import com.qms.campuscard.util.RedisUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,9 @@ public class ConsumeServiceImpl implements ConsumeService {
 
     @Resource
     private ProductMapper productMapper;
+
+    @Resource
+    private StudentService studentService;
 
     @Resource
     private RedisUtil redisUtil;
@@ -89,6 +93,7 @@ public class ConsumeServiceImpl implements ConsumeService {
         if (campusCard.getStatus() == 2) {
             throw new RuntimeException("校园卡已挂失，无法消费");
         }
+        studentService.ensureStudentProfileCompleteByCard(campusCard);
         
         // 查找账户
         QueryWrapper<Account> accountQuery = new QueryWrapper<>();

@@ -17,6 +17,7 @@ import com.qms.campuscard.mapper.TeacherMapper;
 import com.qms.campuscard.mapper.BookMapper;
 import com.qms.campuscard.mapper.BorrowApplicationMapper;
 import com.qms.campuscard.service.BorrowService;
+import com.qms.campuscard.service.StudentService;
 import org.springframework.stereotype.Service;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +48,9 @@ public class BorrowServiceImpl implements BorrowService {
     
     @Resource
     private TeacherMapper teacherMapper;
+
+    @Resource
+    private StudentService studentService;
 
     @Override
     @Transactional
@@ -427,10 +431,24 @@ public class BorrowServiceImpl implements BorrowService {
     }
 
     private void ensureCanBorrow(Long cardId) {
+        CampusCard campusCard = ensureCardAvailable(cardId);
+        studentService.ensureStudentProfileCompleteByCard(campusCard);
+
         BorrowRestrictionStatus restrictionStatus = getBorrowRestrictionStatus(cardId);
         if (Boolean.TRUE.equals(restrictionStatus.getRestricted())) {
             throw new RuntimeException(restrictionStatus.getMessage());
         }
+    }
+
+    private CampusCard ensureCardAvailable(Long cardId) {
+        CampusCard campusCard = campusCardMapper.selectById(cardId);
+        if (campusCard == null || campusCard.getIsDeleted() == null || campusCard.getIsDeleted() != 0) {
+            throw new RuntimeException("校园卡不存在");
+        }
+        if (campusCard.getStatus() == null || campusCard.getStatus() != 1) {
+            throw new RuntimeException("校园卡状态异常，无法借阅");
+        }
+        return campusCard;
     }
 
     private int calculateOverdueDays(LocalDateTime dueTime, LocalDateTime compareTime) {

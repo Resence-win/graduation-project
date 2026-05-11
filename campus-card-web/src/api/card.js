@@ -8,6 +8,10 @@ export const openCard = (data) => {
   return request.post('/card/open', data)
 }
 
+export const batchOpenCard = (data) => {
+  return request.post('/card/batch-open', data)
+}
+
 export const getCardInfo = (cardId) => {
   return request.get(`/card/${cardId}`)
 }

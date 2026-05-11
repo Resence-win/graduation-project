@@ -14,6 +14,7 @@ import com.qms.campuscard.service.CommuteRouteService;
 import com.qms.campuscard.service.CommuteRecordService;
 import com.qms.campuscard.service.CommuteScheduleService;
 import com.qms.campuscard.service.CommuteVehicleService;
+import com.qms.campuscard.service.StudentService;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
@@ -37,6 +38,9 @@ public class CommuteRecordServiceImpl implements CommuteRecordService {
 
     @Resource
     private CommuteScheduleService commuteScheduleService;
+
+    @Resource
+    private StudentService studentService;
 
     @Override
     public IPage<CommuteRecord> getCommuteRecords(Long cardId, Long routeId, Integer page, Integer size) {
@@ -92,6 +96,7 @@ public class CommuteRecordServiceImpl implements CommuteRecordService {
         if (card == null) {
             throw new RuntimeException("校园卡不存在或不可用");
         }
+        studentService.ensureStudentProfileCompleteByCard(card);
 
         CommuteRoute route = commuteRouteService.getRouteById(record.getRouteId());
         if (route == null || !Integer.valueOf(1).equals(route.getStatus())) {

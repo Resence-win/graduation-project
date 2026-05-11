@@ -185,7 +185,7 @@
           下载导入模板
         </el-button>
         <div class="text-xs text-gray-500 mt-2">
-          模板包含必要字段：学号、姓名、学院、专业、班级
+          模板包含导入字段：学号、姓名、学院、专业、班级；手机号和性别可后续补充，学生端业务操作前必须完整
         </div>
       </div>
       <el-form label-width="80px">
@@ -283,6 +283,7 @@ const rules = {
     { required: true, message: '请输入班级', trigger: 'blur' }
   ],
   phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
   ],
   teacherId: [
@@ -497,7 +498,23 @@ const handleImport = async () => {
   try {
     const res = await importStudents(selectedFile)
     if (res.code === 0) {
-      ElMessage.success('导入成功')
+      const result = res.data || {}
+      const failureReasons = result.failureReasons || []
+      const summary = [
+        `总数：${result.totalCount || 0}`,
+        `成功数：${result.successCount || 0}`,
+        `跳过数：${result.skippedCount || 0}`,
+        `失败数：${result.failedCount || 0}`
+      ].join('<br>')
+      const reasonHtml = failureReasons.length
+        ? `<br><br><strong>失败原因：</strong><br>${failureReasons.map(escapeHtml).join('<br>')}`
+        : '<br><br><strong>失败原因：</strong>无'
+
+      ElMessage.success('导入完成')
+      await ElMessageBox.alert(`${summary}${reasonHtml}`, '导入结果', {
+        confirmButtonText: '知道了',
+        dangerouslyUseHTMLString: true
+      })
       dialogImportVisible.value = false
       fileList.value = []
       selectedFile = null
@@ -507,6 +524,15 @@ const handleImport = async () => {
     console.error('导入失败:', error)
     ElMessage.error('导入失败')
   }
+}
+
+const escapeHtml = (value) => {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
 }
 
 const handleDownloadTemplate = async () => {

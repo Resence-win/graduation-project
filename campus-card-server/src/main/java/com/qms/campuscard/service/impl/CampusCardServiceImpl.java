@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.dto.AccountDTO;
+import com.qms.campuscard.dto.BatchOpenCardResult;
+import com.qms.campuscard.dto.CampusCardDTO;
+import com.qms.campuscard.dto.OpenCardRequest;
 import com.qms.campuscard.entity.*;
 import com.qms.campuscard.mapper.*;
 import com.qms.campuscard.service.CampusCardService;
@@ -16,8 +19,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 @Service
 public class CampusCardServiceImpl implements CampusCardService {
@@ -79,6 +85,9 @@ public class CampusCardServiceImpl implements CampusCardService {
     @Override
     @Transactional
     public CampusCard openCard(String userNo, String userType, String remark) {
+        userNo = userNo == null ? null : userNo.trim();
+        userType = userType == null ? null : userType.trim();
+
         // 校验用户是否存在
         Long userId = null;
         try {
@@ -86,6 +95,9 @@ public class CampusCardServiceImpl implements CampusCardService {
             System.out.println("userType: " + userType);
             if (userType == null) {
                 throw new RuntimeException("用户类型不能为空");
+            }
+            if (userNo == null || userNo.isEmpty()) {
+                throw new RuntimeException("用户编号不能为空");
             }
             if ("student".equals(userType)) {
                 QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
@@ -127,10 +139,7 @@ public class CampusCardServiceImpl implements CampusCardService {
             }
         }
 
-        // 生成卡号：年月日 + 6位随机数
-        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String randomNum = String.format("%06d", new Random().nextInt(1000000));
-        String cardNo = dateStr + randomNum;
+        String cardNo = generateCardNo();
 
         // 创建校园卡
         CampusCard campusCard = new CampusCard();
@@ -158,6 +167,51 @@ public class CampusCardServiceImpl implements CampusCardService {
         recordCardChange(campusCard.getId(), "开卡", null, recordRemark);
 
         return campusCard;
+    }
+
+    @Override
+    @Transactional
+    public BatchOpenCardResult batchOpenCards(List<OpenCardRequest> users, String remark) {
+        if (users == null || users.isEmpty()) {
+            throw new RuntimeException("请选择需要开卡的人员");
+        }
+
+        Set<String> userKeys = new HashSet<>();
+        List<OpenCardRequest> validUsers = new ArrayList<>();
+        for (OpenCardRequest user : users) {
+            if (user == null) {
+                throw new RuntimeException("开卡人员信息不能为空");
+            }
+            String userNo = user.getUserNo() == null ? null : user.getUserNo().trim();
+            String userType = user.getUserType() == null ? null : user.getUserType().trim();
+            if (userNo == null || userNo.isEmpty()) {
+                throw new RuntimeException("用户编号不能为空");
+            }
+            if (!"student".equals(userType) && !"teacher".equals(userType)) {
+                throw new RuntimeException("用户类型错误，只能是student或teacher");
+            }
+            String userKey = userType + ":" + userNo;
+            if (!userKeys.add(userKey)) {
+                throw new RuntimeException("重复选择人员：" + userNo);
+            }
+            validUsers.add(user);
+        }
+
+        BatchOpenCardResult result = new BatchOpenCardResult();
+        result.setTotalCount(validUsers.size());
+
+        String batchRemark = remark == null || remark.trim().isEmpty() ? "批量开卡" : remark.trim();
+        for (OpenCardRequest user : validUsers) {
+            CampusCard campusCard = openCard(user.getUserNo(), user.getUserType(), batchRemark);
+            CampusCardDTO cardDTO = getCardById(campusCard.getId());
+            if (cardDTO != null) {
+                result.getCards().add(cardDTO);
+            }
+        }
+
+        result.setSuccessCount(result.getCards().size());
+        result.setFailureCount(result.getTotalCount() - result.getSuccessCount());
+        return result;
     }
 
     @Override
@@ -557,6 +611,10 @@ public class CampusCardServiceImpl implements CampusCardService {
 
     @Override
     public com.baomidou.mybatisplus.core.metadata.IPage<com.qms.campuscard.dto.CampusCardDTO> getCardList(Page<CampusCard> page, String cardNo, Integer status) {
+        if (status != null && status == -1) {
+            return getUnopenedUserList(page, cardNo);
+        }
+
         QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("is_deleted", 0);
         
@@ -632,5 +690,93 @@ public class CampusCardServiceImpl implements CampusCardService {
         redisUtil.del(CARD_INFO_KEY_PREFIX + cardId);
         redisUtil.del(CARD_INFO_NO_KEY_PREFIX + cardNo);
         redisUtil.del(ACCOUNT_BALANCE_KEY_PREFIX + cardId);
+    }
+
+    private String generateCardNo() {
+        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        for (int i = 0; i < 10; i++) {
+            String randomNum = String.format("%06d", new Random().nextInt(1000000));
+            String cardNo = dateStr + randomNum;
+            QueryWrapper<CampusCard> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("card_no", cardNo);
+            if (campusCardMapper.selectCount(queryWrapper) == 0) {
+                return cardNo;
+            }
+        }
+        throw new RuntimeException("卡号生成失败，请重试");
+    }
+
+    private IPage<CampusCardDTO> getUnopenedUserList(Page<CampusCard> page, String keyword) {
+        Set<String> openedUserKeys = getOpenedUserKeys();
+        List<CampusCardDTO> unopenedUsers = new ArrayList<>();
+
+        QueryWrapper<Student> studentQueryWrapper = new QueryWrapper<>();
+        studentQueryWrapper.eq("is_deleted", 0);
+        studentQueryWrapper.orderByDesc("create_time");
+        List<Student> students = studentMapper.selectList(studentQueryWrapper);
+        for (Student student : students) {
+            String userKey = "student:" + student.getId();
+            if (!openedUserKeys.contains(userKey)) {
+                CampusCardDTO dto = new CampusCardDTO();
+                dto.setUserId(student.getId());
+                dto.setUserType("student");
+                dto.setUserNo(student.getStudentNo());
+                dto.setUserName(student.getName());
+                dto.setStatus(-1);
+                dto.setCreateTime(student.getCreateTime());
+                if (matchesUnopenedKeyword(dto, keyword)) {
+                    unopenedUsers.add(dto);
+                }
+            }
+        }
+
+        QueryWrapper<Teacher> teacherQueryWrapper = new QueryWrapper<>();
+        teacherQueryWrapper.eq("is_deleted", 0);
+        teacherQueryWrapper.orderByDesc("create_time");
+        List<Teacher> teachers = teacherMapper.selectList(teacherQueryWrapper);
+        for (Teacher teacher : teachers) {
+            String userKey = "teacher:" + teacher.getId();
+            if (!openedUserKeys.contains(userKey)) {
+                CampusCardDTO dto = new CampusCardDTO();
+                dto.setUserId(teacher.getId());
+                dto.setUserType("teacher");
+                dto.setUserNo(teacher.getTeacherNo());
+                dto.setUserName(teacher.getName());
+                dto.setStatus(-1);
+                dto.setCreateTime(teacher.getCreateTime());
+                if (matchesUnopenedKeyword(dto, keyword)) {
+                    unopenedUsers.add(dto);
+                }
+            }
+        }
+
+        Page<CampusCardDTO> dtoPage = new Page<>(page.getCurrent(), page.getSize());
+        int total = unopenedUsers.size();
+        long fromLong = (page.getCurrent() - 1) * page.getSize();
+        int fromIndex = fromLong > total ? total : (int) fromLong;
+        int toIndex = Math.min(fromIndex + (int) page.getSize(), total);
+        dtoPage.setRecords(unopenedUsers.subList(fromIndex, toIndex));
+        dtoPage.setTotal(total);
+        return dtoPage;
+    }
+
+    private Set<String> getOpenedUserKeys() {
+        QueryWrapper<CampusCard> cardQueryWrapper = new QueryWrapper<>();
+        cardQueryWrapper.eq("is_deleted", 0);
+        List<CampusCard> cards = campusCardMapper.selectList(cardQueryWrapper);
+        Set<String> openedUserKeys = new HashSet<>();
+        for (CampusCard card : cards) {
+            openedUserKeys.add(card.getUserType() + ":" + card.getUserId());
+        }
+        return openedUserKeys;
+    }
+
+    private boolean matchesUnopenedKeyword(CampusCardDTO dto, String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return true;
+        }
+        String trimKeyword = keyword.trim();
+        return (dto.getUserNo() != null && dto.getUserNo().contains(trimKeyword))
+                || (dto.getUserName() != null && dto.getUserName().contains(trimKeyword));
     }
 }

@@ -10,6 +10,7 @@ import com.qms.campuscard.mapper.AttendanceApplicationMapper;
 import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.StudentMapper;
 import com.qms.campuscard.service.AttendanceApplicationService;
+import com.qms.campuscard.service.StudentService;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
@@ -30,9 +31,13 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
     @Resource
     private StudentMapper studentMapper;
 
+    @Resource
+    private StudentService studentService;
+
     @Override
     public AttendanceApplication submitInternshipApplication(AttendanceApplication application) {
         Student student = getStudentByCard(application.getCardId());
+        studentService.ensureStudentProfileComplete(student);
         if (application.getInternshipCompany() == null || application.getInternshipCompany().trim().isEmpty()) {
             throw new RuntimeException("实习单位不能为空");
         }
@@ -54,6 +59,7 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
     @Override
     public AttendanceApplication submitLeaveApplication(AttendanceApplication application) {
         Student student = getStudentByCard(application.getCardId());
+        studentService.ensureStudentProfileComplete(student);
         if (application.getStartDate() == null || application.getEndDate() == null) {
             throw new RuntimeException("请假开始日期和结束日期不能为空");
         }

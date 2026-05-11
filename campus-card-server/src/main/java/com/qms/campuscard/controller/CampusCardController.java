@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.qms.campuscard.common.Result;
 import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.dto.AccountDTO;
+import com.qms.campuscard.dto.BatchOpenCardRequest;
+import com.qms.campuscard.dto.BatchOpenCardResult;
 import com.qms.campuscard.dto.CampusCardDTO;
 import com.qms.campuscard.dto.CardOperationRequest;
 import com.qms.campuscard.dto.OpenCardRequest;
@@ -47,6 +49,24 @@ public class CampusCardController {
             // 记录日志
             logUtil.recordLog(1L, "开卡", "campus_card", null, "开卡失败：" + e.getMessage());
             return Result.error("开卡失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 批量开卡接口：为未开卡学生或教师批量创建校园卡和账户。
+     */
+    @PostMapping("/card/batch-open")
+    public Result<BatchOpenCardResult> batchOpenCard(@RequestBody BatchOpenCardRequest request) {
+        try {
+            if (request == null) {
+                return Result.error("批量开卡失败：请求参数不能为空");
+            }
+            BatchOpenCardResult result = campusCardService.batchOpenCards(request.getUsers(), request.getRemark());
+            logUtil.recordLog(1L, "开卡", "campus_card", null, "批量开卡成功：" + result.getSuccessCount() + "人");
+            return Result.success("批量开卡成功", result);
+        } catch (Exception e) {
+            logUtil.recordLog(1L, "开卡", "campus_card", null, "批量开卡失败：" + e.getMessage());
+            return Result.error("批量开卡失败：" + e.getMessage());
         }
     }
 

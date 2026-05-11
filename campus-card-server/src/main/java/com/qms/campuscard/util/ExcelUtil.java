@@ -15,7 +15,27 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataValidation;
+import org.apache.poi.ss.usermodel.DataValidationConstraint;
+import org.apache.poi.ss.usermodel.DataValidationHelper;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Name;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddressList;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class ExcelUtil {
 
@@ -64,16 +84,191 @@ public class ExcelUtil {
      * 下载学生导入模板
      */
     public static void downloadImportTemplate(HttpServletResponse response) throws IOException {
-        // 设置响应头
+        downloadImportTemplate(response, new LinkedHashMap<>());
+    }
+
+    /**
+     * 下载学生导入模板，包含学院下拉和专业联动下拉。
+     */
+    public static void downloadImportTemplate(HttpServletResponse response, Map<String, List<String>> collegeMajorOptions) throws IOException {
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");
         String fileName = URLEncoder.encode("学生导入模板", StandardCharsets.UTF_8).replaceAll("\\+", "%");
         response.setHeader("Content-disposition", "attachment;filename=" + fileName + ".xlsx");
-        
-        // 导出模板（包含表头但无数据）
-        EasyExcel.write(response.getOutputStream(), StudentImportDto.class)
-                .sheet("学生导入模板")
-                .doWrite(new ArrayList<>());
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("学生导入");
+            Sheet dictSheet = workbook.createSheet("学院专业字典");
+            int hiddenSheetIndex = workbook.getSheetIndex(dictSheet);
+            workbook.setSheetHidden(hiddenSheetIndex, true);
+
+            CellStyle headerStyle = createTemplateHeaderStyle(workbook);
+            CellStyle bodyStyle = createTemplateBodyStyle(workbook);
+
+            String[] headers = {"学号", "姓名", "学院", "专业", "班级"};
+            Row headerRow = sheet.createRow(0);
+            headerRow.setHeightInPoints(28);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            List<String[]> examples = getStudentTemplateExamples();
+            for (int rowIndex = 0; rowIndex < examples.size(); rowIndex++) {
+                Row row = sheet.createRow(rowIndex + 1);
+                row.setHeightInPoints(24);
+                String[] values = examples.get(rowIndex);
+                for (int colIndex = 0; colIndex < headers.length; colIndex++) {
+                    Cell cell = row.createCell(colIndex);
+                    cell.setCellValue(values[colIndex]);
+                    cell.setCellStyle(bodyStyle);
+                }
+            }
+            for (int rowIndex = examples.size() + 1; rowIndex <= 1000; rowIndex++) {
+                Row row = sheet.createRow(rowIndex);
+                row.setHeightInPoints(24);
+                for (int colIndex = 0; colIndex < headers.length; colIndex++) {
+                    row.createCell(colIndex).setCellStyle(bodyStyle);
+                }
+            }
+
+            sheet.setColumnWidth(0, 14 * 256);
+            sheet.setColumnWidth(1, 12 * 256);
+            sheet.setColumnWidth(2, 28 * 256);
+            sheet.setColumnWidth(3, 28 * 256);
+            sheet.setColumnWidth(4, 14 * 256);
+            sheet.createFreezePane(0, 1);
+
+            buildCollegeMajorDictionary(workbook, dictSheet, collegeMajorOptions);
+            addCollegeMajorValidation(sheet, collegeMajorOptions);
+
+            workbook.write(response.getOutputStream());
+        }
+    }
+
+    private static CellStyle createTemplateHeaderStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.DARK_TEAL.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+
+        Font font = workbook.createFont();
+        font.setColor(IndexedColors.WHITE.getIndex());
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 14);
+        style.setFont(font);
+        return style;
+    }
+
+    private static CellStyle createTemplateBodyStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setWrapText(true);
+
+        Font font = workbook.createFont();
+        font.setFontHeightInPoints((short) 12);
+        style.setFont(font);
+        return style;
+    }
+
+    private static List<String[]> getStudentTemplateExamples() {
+        List<String[]> examples = new ArrayList<>();
+        examples.add(new String[]{"20260011", "林雨辰", "计算机与人工智能学院", "软件工程", "软工2301"});
+        examples.add(new String[]{"20260012", "沈嘉宁", "计算机与人工智能学院", "数据科学与大数据技术", "大数据2301"});
+        examples.add(new String[]{"20260013", "唐思远", "经济管理学院", "会计学", "会计2301"});
+        examples.add(new String[]{"20260014", "许晨曦", "机电工程学院", "机械设计制造及其自动化", "机设2301"});
+        examples.add(new String[]{"20260015", "顾安然", "外国语学院", "英语", "英语2302"});
+        examples.add(new String[]{"20260016", "周明哲", "土木与水利工程学院", "工程管理", "工管2301"});
+        return examples;
+    }
+
+    private static void buildCollegeMajorDictionary(Workbook workbook, Sheet dictSheet, Map<String, List<String>> collegeMajorOptions) {
+        Row titleRow = dictSheet.createRow(0);
+        titleRow.createCell(0).setCellValue("学院");
+        titleRow.createCell(1).setCellValue("专业命名区域");
+        titleRow.createCell(3).setCellValue("学院列表");
+
+        int collegeIndex = 0;
+        for (Map.Entry<String, List<String>> entry : collegeMajorOptions.entrySet()) {
+            String rangeName = "MajorList_" + (collegeIndex + 1);
+            int rowIndex = collegeIndex + 1;
+            Row row = dictSheet.createRow(rowIndex);
+            row.createCell(0).setCellValue(entry.getKey());
+            row.createCell(1).setCellValue(rangeName);
+            row.createCell(3).setCellValue(entry.getKey());
+
+            List<String> majors = entry.getValue() == null ? new ArrayList<>() : entry.getValue();
+            int majorColumn = 5 + collegeIndex;
+            for (int majorIndex = 0; majorIndex < majors.size(); majorIndex++) {
+                Row majorRow = dictSheet.getRow(majorIndex + 1);
+                if (majorRow == null) {
+                    majorRow = dictSheet.createRow(majorIndex + 1);
+                }
+                majorRow.createCell(majorColumn).setCellValue(majors.get(majorIndex));
+            }
+
+            if (!majors.isEmpty()) {
+                Name majorName = workbook.createName();
+                majorName.setNameName(rangeName);
+                majorName.setRefersToFormula("'学院专业字典'!" + toExcelColumn(majorColumn) + "$2:" + toExcelColumn(majorColumn) + "$" + (majors.size() + 1));
+            }
+            collegeIndex++;
+        }
+
+        if (!collegeMajorOptions.isEmpty()) {
+            Name collegeListName = workbook.createName();
+            collegeListName.setNameName("CollegeList");
+            collegeListName.setRefersToFormula("'学院专业字典'!$D$2:$D$" + (collegeMajorOptions.size() + 1));
+
+            Name collegeMajorMapName = workbook.createName();
+            collegeMajorMapName.setNameName("CollegeMajorMap");
+            collegeMajorMapName.setRefersToFormula("'学院专业字典'!$A$2:$B$" + (collegeMajorOptions.size() + 1));
+        }
+    }
+
+    private static void addCollegeMajorValidation(Sheet sheet, Map<String, List<String>> collegeMajorOptions) {
+        if (collegeMajorOptions == null || collegeMajorOptions.isEmpty()) {
+            return;
+        }
+        DataValidationHelper helper = sheet.getDataValidationHelper();
+
+        DataValidationConstraint collegeConstraint = helper.createFormulaListConstraint("CollegeList");
+        CellRangeAddressList collegeRange = new CellRangeAddressList(1, 1000, 2, 2);
+        DataValidation collegeValidation = helper.createValidation(collegeConstraint, collegeRange);
+        collegeValidation.setSuppressDropDownArrow(true);
+        collegeValidation.setShowErrorBox(true);
+        collegeValidation.createErrorBox("学院选择错误", "请从下拉列表中选择系统已启用的学院");
+        sheet.addValidationData(collegeValidation);
+
+        DataValidationConstraint majorConstraint = helper.createFormulaListConstraint("INDIRECT(VLOOKUP($C2,CollegeMajorMap,2,FALSE))");
+        CellRangeAddressList majorRange = new CellRangeAddressList(1, 1000, 3, 3);
+        DataValidation majorValidation = helper.createValidation(majorConstraint, majorRange);
+        majorValidation.setSuppressDropDownArrow(true);
+        majorValidation.setShowErrorBox(true);
+        majorValidation.createErrorBox("专业选择错误", "请先选择学院，再从下拉列表中选择该学院下的专业");
+        sheet.addValidationData(majorValidation);
+    }
+
+    private static String toExcelColumn(int zeroBasedColumnIndex) {
+        StringBuilder columnName = new StringBuilder();
+        int dividend = zeroBasedColumnIndex + 1;
+        while (dividend > 0) {
+            int modulo = (dividend - 1) % 26;
+            columnName.insert(0, (char) ('A' + modulo));
+            dividend = (dividend - modulo) / 26;
+        }
+        return "$" + columnName;
     }
 
     /**

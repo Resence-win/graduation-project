@@ -7,6 +7,15 @@
           <el-button type="primary" @click="getCurrentLocation">获取当前位置</el-button>
         </div>
       </template>
+
+      <el-alert
+        v-if="!studentProfileComplete"
+        :title="studentProfileIncompleteMessage"
+        type="warning"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 16px"
+      />
       
       <!-- 当前位置信息 -->
       <div class="current-location" v-if="currentLocation">
@@ -124,7 +133,7 @@
                 </el-select>
               </el-form-item>
             </el-form>
-            <el-button type="primary" @click="handleScanQRCode" style="margin-top: 20px">扫码上车</el-button>
+            <el-button type="primary" :disabled="!studentProfileComplete" @click="handleScanQRCode" style="margin-top: 20px">扫码上车</el-button>
             <div v-if="scanResult" class="scan-result">
               <el-alert
                 :title="scanResult.success ? '扫码成功' : '扫码失败'"
@@ -231,6 +240,7 @@ import {
   getStationList,
   addCommuteRecord
 } from '@/api/commute'
+import { getStudentByNo } from '@/api/student'
 
 // 线路列表
 const routeList = ref([])
@@ -251,6 +261,14 @@ const stationList = ref([])
 
 const activeRouteList = computed(() => routeList.value.filter(route => route.status === 1))
 const activeVehicleList = computed(() => vehicleList.value.filter(vehicle => vehicle.status === 1))
+const studentInfo = ref(null)
+const studentProfileIncompleteMessage = '请先在个人中心完善姓名、性别、学院、专业、班级、手机号后再进行该操作'
+const studentProfileComplete = computed(() => {
+  if (!studentInfo.value) {
+    return false
+  }
+  return Boolean(studentInfo.value.name && studentInfo.value.gender && studentInfo.value.college && studentInfo.value.major && studentInfo.value.className && studentInfo.value.phone && /^1[3-9]\d{9}$/.test(studentInfo.value.phone))
+})
 
 // 我的乘车记录
 const myRecordList = ref([])
@@ -351,6 +369,20 @@ const loadVehicleList = async () => {
     }
   } catch (error) {
     console.error('加载车辆列表失败:', error)
+  }
+}
+
+const loadStudentInfo = async () => {
+  try {
+    const userStr = localStorage.getItem('user')
+    const user = userStr ? JSON.parse(userStr) : null
+    if (!user?.username) return
+    const res = await getStudentByNo(user.username)
+    if (res.code === 0) {
+      studentInfo.value = res.data
+    }
+  } catch (error) {
+    console.error('加载学生资料失败:', error)
   }
 }
 
@@ -683,6 +715,10 @@ const getStudentCardId = () => {
 // 扫码上车
 const handleScanQRCode = async () => {
   try {
+    if (!studentProfileComplete.value) {
+      ElMessage.warning(studentProfileIncompleteMessage)
+      return
+    }
     // 验证表单
     if (!scanForm.routeId) {
       ElMessage.error('请选择线路')
@@ -762,6 +798,7 @@ const handleScanQRCode = async () => {
 }
 
 onMounted(async () => {
+  await loadStudentInfo()
   await Promise.all([
     loadRouteList(),
     loadVehicleList(),
