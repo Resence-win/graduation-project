@@ -8,7 +8,7 @@
 DROP TABLE IF EXISTS student;
 CREATE TABLE student (
     id BIGSERIAL PRIMARY KEY,
-    student_no VARCHAR(20) UNIQUE NOT NULL,
+    student_no VARCHAR(20) NOT NULL,
     name VARCHAR(50),
     gender VARCHAR(10),
     college VARCHAR(100),
@@ -49,7 +49,7 @@ COMMENT ON COLUMN student.is_deleted IS '是否删除(0否1是)';
 DROP TABLE IF EXISTS teacher;
 CREATE TABLE teacher (
     id BIGSERIAL PRIMARY KEY,
-    teacher_no VARCHAR(20) UNIQUE NOT NULL,
+    teacher_no VARCHAR(20) NOT NULL,
     name VARCHAR(50),
     gender VARCHAR(10),
     department VARCHAR(100),
@@ -244,7 +244,40 @@ COMMENT ON COLUMN recharge_record.create_time IS '创建时间';
 COMMENT ON COLUMN recharge_record.is_deleted IS '是否删除';
 
 -- ========================
--- 10. 消费记录
+-- 10. 支付宝充值订单
+-- ========================
+DROP TABLE IF EXISTS recharge_order;
+CREATE TABLE recharge_order (
+    id BIGSERIAL PRIMARY KEY,
+    out_trade_no VARCHAR(64) NOT NULL,
+    card_id BIGINT NOT NULL,
+    amount NUMERIC(10,2) NOT NULL,
+    status VARCHAR(20) DEFAULT 'WAIT_PAY',
+    alipay_trade_no VARCHAR(64),
+    operator_id BIGINT,
+    paid_time TIMESTAMP,
+    settled_time TIMESTAMP,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+COMMENT ON TABLE recharge_order IS '支付宝充值订单表';
+COMMENT ON COLUMN recharge_order.id IS '主键ID';
+COMMENT ON COLUMN recharge_order.out_trade_no IS '商户订单号';
+COMMENT ON COLUMN recharge_order.card_id IS '校园卡ID';
+COMMENT ON COLUMN recharge_order.amount IS '充值金额';
+COMMENT ON COLUMN recharge_order.status IS '订单状态(WAIT_PAY/SETTLED/CLOSED)';
+COMMENT ON COLUMN recharge_order.alipay_trade_no IS '支付宝交易号';
+COMMENT ON COLUMN recharge_order.operator_id IS '操作人';
+COMMENT ON COLUMN recharge_order.paid_time IS '支付时间';
+COMMENT ON COLUMN recharge_order.settled_time IS '入账时间';
+COMMENT ON COLUMN recharge_order.create_time IS '创建时间';
+COMMENT ON COLUMN recharge_order.update_time IS '更新时间';
+COMMENT ON COLUMN recharge_order.is_deleted IS '是否删除';
+
+-- ========================
+-- 11. 消费记录
 -- ========================
 DROP TABLE IF EXISTS consume_record;
 CREATE TABLE consume_record (
@@ -757,11 +790,16 @@ ADD CONSTRAINT uk_account_card UNIQUE(card_id);
 -- 2. 卡号唯一（虽然你写了 UNIQUE，这里是规范写法补充说明）
 -- 已存在：campus_card.card_no UNIQUE
 
--- 3. 学号唯一（已存在 UNIQUE，这里补充规范说明）
--- 已存在：student.student_no UNIQUE
+-- 3. 未删除的学号唯一
 
--- 4. 教师编号唯一（已存在 UNIQUE）
--- 已存在：teacher.teacher_no UNIQUE
+CREATE UNIQUE INDEX uk_student_no_active
+ON student(student_no)
+WHERE is_deleted = 0;
+
+-- 4. 未删除的教师编号唯一
+CREATE UNIQUE INDEX uk_teacher_no_active
+ON teacher(teacher_no)
+WHERE is_deleted = 0;
 
 -- 5. 商户类型名称唯一（防止重复类型）
 ALTER TABLE merchant_type 
@@ -771,9 +809,10 @@ ADD CONSTRAINT uk_merchant_type_name UNIQUE(type_name);
 ALTER TABLE merchant 
 ADD CONSTRAINT uk_merchant_name UNIQUE(merchant_name);
 
--- 7. 管理员用户名唯一（必须）
-ALTER TABLE admin_user 
-ADD CONSTRAINT uk_admin_username UNIQUE(username);
+-- 7. 未删除的管理员用户名唯一（必须）
+CREATE UNIQUE INDEX uk_admin_username_active
+ON admin_user(username)
+WHERE is_deleted = 0;
 
 -- 8. 未删除的学院专业不重复
 CREATE UNIQUE INDEX uk_college_major_active
@@ -795,6 +834,9 @@ CREATE INDEX idx_account_status ON account(status);
 -- 充值记录索引
 CREATE INDEX idx_recharge_account_id ON recharge_record(account_id);
 CREATE INDEX idx_recharge_time ON recharge_record(create_time);
+CREATE UNIQUE INDEX idx_recharge_order_out_trade_no ON recharge_order(out_trade_no);
+CREATE INDEX idx_recharge_order_card_id ON recharge_order(card_id);
+CREATE INDEX idx_recharge_order_status ON recharge_order(status);
 
 -- 消费记录索引
 CREATE INDEX idx_consume_account_id ON consume_record(account_id);

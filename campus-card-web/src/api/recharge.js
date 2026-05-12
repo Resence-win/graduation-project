@@ -17,3 +17,11 @@ export const rechargeByCardNo = (data) => {
 export const getRechargeList = (params) => {
   return request.get('/recharge/list', { params })
 }
+
+export const createAlipayPagePay = (data) => {
+  return request.post('/recharge/alipay/page-pay', data)
+}
+
+export const queryAlipayRechargeStatus = (outTradeNo) => {
+  return request.get(`/recharge/alipay/status/${outTradeNo}`, { timeout: 40000 })
+}

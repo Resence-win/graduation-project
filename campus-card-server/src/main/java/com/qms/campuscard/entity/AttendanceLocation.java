@@ -29,6 +29,9 @@ public class AttendanceLocation {
 
     private Integer status;
 
+    @TableField(exist = false)
+    private String teacherName;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

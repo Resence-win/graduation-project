@@ -4,13 +4,18 @@
       <template #header>
         <div class="card-header">
           <span>打卡位置管理</span>
-          <el-button type="primary" @click="handleAddLocation">添加打卡位置</el-button>
+          <el-button v-if="currentUser.role === 'teacher'" type="primary" @click="handleAddLocation">添加打卡位置</el-button>
         </div>
       </template>
       
       <el-table :data="locationList" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="locationName" label="位置名称" />
+        <el-table-column v-if="currentUser.role === 'admin'" prop="teacherName" label="发布老师" width="120">
+          <template #default="{ row }">
+            {{ row.teacherName || row.teacherId || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="location" label="位置描述" />
         <el-table-column prop="latitude" label="纬度" width="120" />
         <el-table-column prop="longitude" label="经度" width="120" />
@@ -49,9 +54,9 @@
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="500px"
+      width="680px"
     >
-      <el-form :model="locationForm" label-width="100px">
+      <el-form :model="locationForm" label-width="100px" class="location-form">
         <el-form-item label="位置名称" prop="locationName">
           <el-input v-model="locationForm.locationName" placeholder="请输入位置名称" />
         </el-form-item>
@@ -67,21 +72,70 @@
         <el-form-item label="打卡半径" prop="radius">
           <el-input type="number" v-model="locationForm.radius" placeholder="请输入打卡半径(米)" />
         </el-form-item>
-        <el-form-item label="开始时间" prop="startTime">
-          <el-date-picker v-model="locationForm.startTime" type="datetime" placeholder="选择开始时间" />
-        </el-form-item>
-        <el-form-item label="结束时间" prop="endTime">
+        <el-form-item label="签到日期" prop="attendanceDate">
           <el-date-picker
-            v-model="locationForm.endTime"
-            type="datetime"
-            placeholder="选择结束时间"
-            :disabled-date="disabledEndDate"
+            v-model="timeForm.attendanceDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择签到日期"
+            :disabled-date="disabledAttendanceDate"
+            :disabled="isRunningLocation"
+            style="width: 100%"
           />
         </el-form-item>
+        <el-form-item label="签到时间" prop="startTime">
+          <div class="time-window-row">
+            <el-time-picker
+              v-model="timeForm.startClock"
+              format="HH:mm"
+              value-format="HH:mm:ss"
+              placeholder="开始"
+              :disabled="isRunningLocation"
+            />
+            <span class="time-separator">至</span>
+            <el-time-picker
+              v-model="timeForm.endClock"
+              format="HH:mm"
+              value-format="HH:mm:ss"
+              placeholder="结束"
+            />
+          </div>
+          <div class="quick-time-list">
+            <el-button
+              v-for="range in quickTimeRanges"
+              :key="range.label"
+              size="small"
+              :type="isQuickRangeActive(range) ? 'primary' : 'default'"
+              :disabled="isRunningLocation"
+              @click="applyQuickTimeRange(range)"
+            >
+              {{ range.label }}
+            </el-button>
+          </div>
+          <div class="time-rule-tip">
+            开始后15分钟内为正常，之后到结束前为迟到；结束后未打卡将补记缺勤。
+          </div>
+        </el-form-item>
+        <el-alert
+          v-if="isRunningLocation"
+          title="该打卡位置已开始，仅允许延长结束时间或调整地点信息，开始时间保持不变。"
+          type="warning"
+          show-icon
+          :closable="false"
+          class="form-alert"
+        />
+        <el-alert
+          v-if="isEndedLocation"
+          title="该打卡位置已结束，不允许继续修改，以免影响历史考勤记录。"
+          type="error"
+          show-icon
+          :closable="false"
+          class="form-alert"
+        />
         <el-form-item label="状态" prop="status">
           <el-select v-model="locationForm.status" placeholder="请选择状态">
-            <el-option label="有效" value="1" />
-            <el-option label="无效" value="0" />
+            <el-option label="有效" :value="1" />
+            <el-option label="无效" :value="0" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -147,12 +201,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import dayjs from 'dayjs'
 import { 
   createLocation, 
   updateLocation, 
   deleteLocation, 
+  getAllLocations,
   getLocationsByTeacherId, 
   getAttendanceRecordsByLocationId 
 } from '@/api/attendance'
@@ -163,15 +219,31 @@ const dialogVisible = ref(false)
 const recordDialogVisible = ref(false)
 const dialogTitle = ref('添加打卡位置')
 const currentLocationId = ref(null)
-const currentTeacherId = ref(1) // 从用户信息中获取老师ID
+const currentUser = ref({})
+const currentTeacherId = ref(null)
+const originalStartTime = ref(null)
+const originalEndTime = ref(null)
 
-// 获取当前老师ID
-const getCurrentTeacherId = () => {
+const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+
+const quickTimeRanges = [
+  { label: '08:00-08:15', start: '08:00:00', end: '08:15:00' },
+  { label: '10:00-10:15', start: '10:00:00', end: '10:15:00' },
+  { label: '14:00-14:15', start: '14:00:00', end: '14:15:00' },
+  { label: '19:00-19:15', start: '19:00:00', end: '19:15:00' }
+]
+
+const loadCurrentUser = () => {
   const userStr = localStorage.getItem('user')
   if (userStr) {
-    const user = JSON.parse(userStr)
-    // 假设用户信息中包含老师ID，实际需要根据后端返回的用户信息结构调整
-    currentTeacherId.value = user.id || 1
+    try {
+      const user = JSON.parse(userStr)
+      currentUser.value = user
+      currentTeacherId.value = user.role === 'teacher' ? user.businessUserId : null
+    } catch (error) {
+      currentUser.value = {}
+      currentTeacherId.value = null
+    }
   }
 }
 
@@ -202,6 +274,64 @@ const locationForm = reactive({
   teacherId: currentTeacherId.value
 })
 
+const timeForm = reactive({
+  attendanceDate: '',
+  startClock: '',
+  endClock: ''
+})
+
+const parseDateTime = (value) => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  const normalized = String(value).replace(' ', 'T')
+  const date = new Date(normalized)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const getTimestamp = (value) => {
+  const date = parseDateTime(value)
+  return date ? date.getTime() : null
+}
+
+const formatDateTime = (value) => {
+  const date = parseDateTime(value)
+  return date ? dayjs(date).format(DATE_TIME_FORMAT) : ''
+}
+
+const formatDate = (value) => {
+  const date = parseDateTime(value)
+  return date ? dayjs(date).format('YYYY-MM-DD') : ''
+}
+
+const formatClock = (value) => {
+  const date = parseDateTime(value)
+  return date ? dayjs(date).format('HH:mm:ss') : ''
+}
+
+const normalizeClock = (value) => {
+  if (!value) return ''
+  return value.length === 5 ? `${value}:00` : value
+}
+
+const buildDateTime = (date, clock) => {
+  if (!date || !clock) return ''
+  return `${date} ${normalizeClock(clock)}`
+}
+
+const locationEditPhase = computed(() => {
+  if (!currentLocationId.value) return 'new'
+  const startTimestamp = getTimestamp(originalStartTime.value)
+  const endTimestamp = getTimestamp(originalEndTime.value)
+  const now = Date.now()
+  if (!startTimestamp || !endTimestamp) return 'new'
+  if (now < startTimestamp) return 'pending'
+  if (now <= endTimestamp) return 'running'
+  return 'ended'
+})
+
+const isRunningLocation = computed(() => locationEditPhase.value === 'running')
+const isEndedLocation = computed(() => locationEditPhase.value === 'ended')
+
 const getStatusType = (status) => {
   const map = {
     '正常': 'success',
@@ -227,8 +357,8 @@ const getLocationStatus = (row) => {
     return { type: 'danger', text: '已停用' }
   }
   const now = Date.now()
-  const startTime = row.startTime ? new Date(row.startTime).getTime() : null
-  const endTime = row.endTime ? new Date(row.endTime).getTime() : null
+  const startTime = getTimestamp(row.startTime)
+  const endTime = getTimestamp(row.endTime)
   if (!startTime || !endTime) {
     return { type: 'info', text: '未配置' }
   }
@@ -241,14 +371,41 @@ const getLocationStatus = (row) => {
   return { type: 'success', text: '有效中' }
 }
 
-const disabledEndDate = (time) => {
-  if (!locationForm.startTime) {
+const getTodayStart = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+const disabledPastDate = (time) => {
+  return time.getTime() < getTodayStart().getTime()
+}
+
+const disabledAttendanceDate = (time) => {
+  if (currentLocationId.value) {
     return false
   }
-  const startDate = new Date(locationForm.startTime)
-  const endOfPreviousDay = new Date(startDate)
-  endOfPreviousDay.setHours(0, 0, 0, 0)
-  return time.getTime() < endOfPreviousDay.getTime()
+  return disabledPastDate(time)
+}
+
+const resetTimeForm = () => {
+  timeForm.attendanceDate = ''
+  timeForm.startClock = ''
+  timeForm.endClock = ''
+}
+
+const fillTimeForm = (startTime, endTime) => {
+  timeForm.attendanceDate = formatDate(startTime)
+  timeForm.startClock = formatClock(startTime)
+  timeForm.endClock = formatClock(endTime)
+}
+
+const applyQuickTimeRange = (range) => {
+  timeForm.startClock = range.start
+  timeForm.endClock = range.end
+}
+
+const isQuickRangeActive = (range) => {
+  return timeForm.startClock === range.start && timeForm.endClock === range.end
 }
 
 // 获取当前位置
@@ -305,10 +462,20 @@ const getLocationDescription = (latitude, longitude) => {
 
 const loadLocations = async () => {
   try {
-    const res = await getLocationsByTeacherId(currentTeacherId.value, {
+    let res
+    const params = {
       page: pagination.page,
       size: pagination.size
-    })
+    }
+    if (currentUser.value.role === 'teacher') {
+      if (!currentTeacherId.value) {
+        ElMessage.error('未获取到老师信息')
+        return
+      }
+      res = await getLocationsByTeacherId(currentTeacherId.value, params)
+    } else {
+      res = await getAllLocations(params)
+    }
     if (res.code === 0) {
       locationList.value = res.data.records || []
       pagination.total = res.data.total || 0
@@ -336,36 +503,46 @@ const loadRecords = async (locationId) => {
 }
 
 const handleAddLocation = () => {
+  if (currentUser.value.role !== 'teacher' || !currentTeacherId.value) {
+    ElMessage.warning('仅老师可以发布打卡位置')
+    return
+  }
   dialogTitle.value = '添加打卡位置'
   currentLocationId.value = null
+  originalStartTime.value = null
+  originalEndTime.value = null
   Object.assign(locationForm, {
     locationName: '',
     location: '',
     latitude: null,
     longitude: null,
     radius: 50,
-    startTime: null,
-    endTime: null,
+    startTime: '',
+    endTime: '',
     status: 1,
     teacherId: currentTeacherId.value
   })
+  resetTimeForm()
   dialogVisible.value = true
 }
 
 const handleEditLocation = (row) => {
   dialogTitle.value = '编辑打卡位置'
   currentLocationId.value = row.id
+  originalStartTime.value = formatDateTime(row.startTime)
+  originalEndTime.value = formatDateTime(row.endTime)
   Object.assign(locationForm, {
     locationName: row.locationName,
     location: row.location,
     latitude: row.latitude,
     longitude: row.longitude,
     radius: row.radius,
-    startTime: row.startTime ? new Date(row.startTime) : null,
-    endTime: row.endTime ? new Date(row.endTime) : null,
+    startTime: originalStartTime.value,
+    endTime: originalEndTime.value,
     status: row.status,
-    teacherId: currentTeacherId.value
+    teacherId: row.teacherId || currentTeacherId.value
   })
+  fillTimeForm(originalStartTime.value, originalEndTime.value)
   dialogVisible.value = true
 }
 
@@ -382,25 +559,62 @@ const handleSaveLocation = async () => {
     ElMessage.error('打卡半径必须大于0')
     return
   }
-  if (!locationForm.startTime || !locationForm.endTime) {
-    ElMessage.error('请选择开始时间和结束时间')
+  if (!timeForm.attendanceDate || !timeForm.startClock || !timeForm.endClock) {
+    ElMessage.error('请选择签到日期、开始时间和结束时间')
     return
   }
-  if (new Date(locationForm.endTime).getTime() <= new Date(locationForm.startTime).getTime()) {
+
+  const startTime = buildDateTime(timeForm.attendanceDate, timeForm.startClock)
+  const endTime = buildDateTime(timeForm.attendanceDate, timeForm.endClock)
+  const startTimestamp = getTimestamp(startTime)
+  const endTimestamp = getTimestamp(endTime)
+  const now = Date.now()
+
+  if (!startTimestamp || !endTimestamp) {
+    ElMessage.error('签到时间格式不正确')
+    return
+  }
+  if (isEndedLocation.value) {
+    ElMessage.error('已结束的打卡位置不允许修改')
+    return
+  }
+  if (!currentLocationId.value && startTimestamp < now) {
+    ElMessage.error('开始时间不能早于当前时间')
+    return
+  }
+  if (endTimestamp <= startTimestamp) {
     ElMessage.error('结束时间必须晚于开始时间')
     return
   }
+  if (isRunningLocation.value) {
+    const originalStartTimestamp = getTimestamp(originalStartTime.value)
+    if (originalStartTimestamp && startTimestamp !== originalStartTimestamp) {
+      ElMessage.error('已开始的打卡位置不能修改开始时间')
+      return
+    }
+    if (endTimestamp <= now) {
+      ElMessage.error('进行中的打卡位置结束时间必须晚于当前时间')
+      return
+    }
+  }
+
+  const payload = {
+    ...locationForm,
+    startTime,
+    endTime
+  }
+
   try {
     let res
     if (currentLocationId.value) {
       // 更新
       res = await updateLocation({
         id: currentLocationId.value,
-        ...locationForm
+        ...payload
       })
     } else {
       // 添加
-      res = await createLocation(locationForm)
+      res = await createLocation(payload)
     }
     if (res.code === 0) {
       ElMessage.success(currentLocationId.value ? '更新成功' : '添加成功')
@@ -454,7 +668,7 @@ const handleRecordCurrentChange = (val) => {
 }
 
 onMounted(() => {
-  getCurrentTeacherId()
+  loadCurrentUser()
   loadLocations()
 })
 </script>
@@ -468,6 +682,51 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.location-form :deep(.el-date-editor),
+.location-form :deep(.el-select) {
+  width: 100%;
+}
+
+.time-window-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.time-separator {
+  color: #606266;
+  white-space: nowrap;
+}
+
+.quick-time-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.quick-time-list .el-button {
+  margin-left: 0;
+}
+
+.time-rule-tip {
+  margin-top: 8px;
+  color: #909399;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.form-alert {
+  margin-bottom: 18px;
+}
+
+.location-error {
+  margin-left: 12px;
+  color: #f56c6c;
 }
 
 .dialog-footer {

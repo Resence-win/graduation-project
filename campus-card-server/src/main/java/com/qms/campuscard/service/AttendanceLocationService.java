@@ -19,5 +19,5 @@ public interface AttendanceLocationService {
 
     IPage<AttendanceLocation> getAllLocations(Integer page, Integer size);
 
-    List<AttendanceLocation> getActiveLocations();
+    List<AttendanceLocation> getActiveLocations(Long cardId);
 }

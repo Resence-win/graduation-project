@@ -28,3 +28,39 @@ export const getMerchantRank = (params = {}) => {
   }
   return request.get('/stat/merchant-rank', { params: { ...defaultParams, ...params } })
 }
+
+export const getLibraryOverdueStat = (params = {}) => {
+  const defaultParams = {
+    start_date: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
+    end_date: dayjs().format('YYYY-MM-DD')
+  }
+  return request.get('/stat/library-overdue', { params: { ...defaultParams, ...params } })
+}
+
+export const getLibraryBookDetails = (params = {}) => {
+  return request.get('/stat/library-book-details', { params })
+}
+
+export const getCardCancelStat = (params = {}) => {
+  const defaultParams = {
+    start_date: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
+    end_date: dayjs().format('YYYY-MM-DD')
+  }
+  return request.get('/stat/card-cancel', { params: { ...defaultParams, ...params } })
+}
+
+export const getCardCancelDetails = (params = {}) => {
+  return request.get('/stat/card-cancel/details', { params })
+}
+
+export const getWeeklyAttendanceStat = (params = {}) => {
+  return request.get('/stat/weekly-attendance', { params })
+}
+
+export const getCommuteStat = (params = {}) => {
+  const defaultParams = {
+    start_date: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
+    end_date: dayjs().format('YYYY-MM-DD')
+  }
+  return request.get('/stat/commute', { params: { ...defaultParams, ...params } })
+}

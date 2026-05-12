@@ -80,8 +80,8 @@ public class AttendanceController {
      * 可用考勤点接口：查询当前启用的考勤地点，供学生打卡时选择。
      */
     @GetMapping("/location/active")
-    public Result<?> getActiveLocations() {
-        return Result.success(attendanceLocationService.getActiveLocations());
+    public Result<?> getActiveLocations(@RequestParam(required = false) Long card_id) {
+        return Result.success(attendanceLocationService.getActiveLocations(card_id));
     }
 
     // 考勤记录相关接口

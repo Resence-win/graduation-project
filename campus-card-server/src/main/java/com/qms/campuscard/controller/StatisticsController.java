@@ -72,4 +72,80 @@ public class StatisticsController {
         logUtil.recordLog(1L, "查询", "statistics", null, "查询商户消费排行，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
         return Result.success(data);
     }
+
+    /**
+     * 图书馆统计接口：统计当前逾期、当前借出、可借出图书和禁借剩余天数排行。
+     */
+    @GetMapping("/api/stat/library-overdue")
+    public Result<Map<String, Object>> getLibraryOverdueStatistics(
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date,
+            @RequestParam(required = false, defaultValue = "10") Integer limit) {
+        Map<String, Object> data = statisticsService.getLibraryOverdueStatistics(start_date, end_date, limit);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询图书馆逾期统计，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
+        return Result.success(data);
+    }
+
+    /**
+     * 图书统计明细接口：按当前逾期、当前借出、可借出分类查询弹窗表格数据。
+     */
+    @GetMapping("/api/stat/library-book-details")
+    public Result<Map<String, Object>> getLibraryBookDetails(
+            @RequestParam(required = false, defaultValue = "overdue") String type,
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer size) {
+        Map<String, Object> data = statisticsService.getLibraryBookDetails(type, page, size);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询图书统计明细，类型：" + type);
+        return Result.success(data);
+    }
+
+    /**
+     * 校园卡注销统计接口：按注销原因、时间和人员类型聚合注销记录。
+     */
+    @GetMapping("/api/stat/card-cancel")
+    public Result<Map<String, Object>> getCardCancelStatistics(
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date) {
+        Map<String, Object> data = statisticsService.getCardCancelStatistics(start_date, end_date);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询校园卡注销统计，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
+        return Result.success(data);
+    }
+
+    /**
+     * 校园卡注销明细接口：查询注销卡弹窗表格。
+     */
+    @GetMapping("/api/stat/card-cancel/details")
+    public Result<Map<String, Object>> getCardCancelDetails(
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date,
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer size) {
+        Map<String, Object> data = statisticsService.getCardCancelDetails(start_date, end_date, page, size);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询校园卡注销明细，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
+        return Result.success(data);
+    }
+
+    /**
+     * 考勤趋势统计接口：统计指定日期区间或最近七天的正常、迟到、早退、缺勤数量。
+     */
+    @GetMapping("/api/stat/weekly-attendance")
+    public Result<Map<String, Object>> getWeeklyAttendanceStatistics(
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date) {
+        Map<String, Object> data = statisticsService.getWeeklyAttendanceStatistics(start_date, end_date);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询一周考勤统计");
+        return Result.success(data);
+    }
+
+    /**
+     * 通勤车统计接口：按线路、班次、车辆统计乘车人数和空座率。
+     */
+    @GetMapping("/api/stat/commute")
+    public Result<Map<String, Object>> getCommuteStatistics(
+            @RequestParam(required = false, defaultValue = "") String start_date,
+            @RequestParam(required = false, defaultValue = "") String end_date) {
+        Map<String, Object> data = statisticsService.getCommuteStatistics(start_date, end_date);
+        logUtil.recordLog(1L, "查询", "statistics", null, "查询通勤车统计，时间范围：" + (start_date.isEmpty() ? "全部" : start_date) + " 至 " + (end_date.isEmpty() ? "全部" : end_date));
+        return Result.success(data);
+    }
 }

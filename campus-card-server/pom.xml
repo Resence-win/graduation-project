@@ -70,6 +70,13 @@
             <version>4.0.3</version>
         </dependency>
 
+        <!-- 支付宝开放平台 SDK，用于沙箱电脑网站支付 -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+            <version>4.40.771.ALL</version>
+        </dependency>
+
         <!-- HTML 清洗，用于富文本内容安全处理 -->
         <dependency>
             <groupId>org.jsoup</groupId>

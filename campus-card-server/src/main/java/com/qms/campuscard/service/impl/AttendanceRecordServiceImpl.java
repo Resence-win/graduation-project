@@ -9,6 +9,7 @@ import com.qms.campuscard.entity.CampusCard;
 import com.qms.campuscard.entity.Student;
 import com.qms.campuscard.entity.AttendanceApplication;
 import com.qms.campuscard.mapper.AttendanceApplicationMapper;
+import com.qms.campuscard.mapper.AttendanceLocationMapper;
 import com.qms.campuscard.mapper.AttendanceRecordMapper;
 import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.StudentMapper;
@@ -21,16 +22,22 @@ import jakarta.annotation.Resource;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
 public class AttendanceRecordServiceImpl implements AttendanceRecordService {
+
+    private static final long NORMAL_CHECKIN_GRACE_MINUTES = 15;
 
     @Resource
     private AttendanceRecordMapper attendanceRecordMapper;
     
     @Resource
     private AttendanceLocationService attendanceLocationService;
+
+    @Resource
+    private AttendanceLocationMapper attendanceLocationMapper;
     
     @Resource
     private CampusCardMapper campusCardMapper;
@@ -93,9 +100,10 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         String studentAttendanceMode = "CAMPUS";
         String studentAttendanceStatus = "ON_CAMPUS";
         String studentInternshipCompany = null;
+        Student student = null;
         AttendanceApplication activeLeaveApplication = null;
         if ("student".equalsIgnoreCase(campusCard.getUserType())) {
-            Student student = studentMapper.selectById(campusCard.getUserId());
+            student = studentMapper.selectById(campusCard.getUserId());
             if (student != null && student.getAttendanceMode() != null && !student.getAttendanceMode().trim().isEmpty()) {
                 studentAttendanceMode = student.getAttendanceMode().trim().toUpperCase();
             }
@@ -170,6 +178,7 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
             if (locationId != null) {
                 AttendanceLocation location = attendanceLocationService.getLocationById(locationId);
                 validateActiveLocation(location);
+                validateStudentLocationPermission(campusCard, student, location);
             }
             LocalDate today = LocalDate.now();
             QueryWrapper<AttendanceRecord> checkWrapper = new QueryWrapper<>();
@@ -227,15 +236,13 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
             }
 
             validateActiveLocation(location);
+            validateStudentLocationPermission(campusCard, student, location);
             LocalDateTime now = LocalDateTime.now();
-            if (now.isBefore(location.getStartTime())) {
-                status = "正常";
-            } else if (now.isBefore(location.getStartTime().plusMinutes(30))) {
-                status = "迟到";
-            } else if (now.isBefore(location.getEndTime())) {
+            LocalDateTime normalDeadline = location.getStartTime().plusMinutes(NORMAL_CHECKIN_GRACE_MINUTES);
+            if (!now.isAfter(normalDeadline)) {
                 status = "正常";
             } else {
-                status = "缺勤";
+                status = "迟到";
             }
         }
         
@@ -269,6 +276,21 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         fillRecordExtraInfo(result);
         
         return result;
+    }
+
+    @Override
+    public void generateMissingAttendanceRecords() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now();
+        QueryWrapper<AttendanceLocation> locationQuery = new QueryWrapper<>();
+        locationQuery.eq("status", 1);
+        locationQuery.ge("end_time", today.atStartOfDay());
+        locationQuery.le("end_time", now);
+        locationQuery.eq("is_deleted", 0);
+        List<AttendanceLocation> locations = attendanceLocationMapper.selectList(locationQuery);
+        for (AttendanceLocation location : locations) {
+            generateMissingAttendanceRecords(location);
+        }
     }
 
     @Override
@@ -376,6 +398,114 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         queryWrapper.orderByDesc("create_time");
         queryWrapper.last("LIMIT 1");
         return attendanceApplicationMapper.selectOne(queryWrapper);
+    }
+
+    private void generateMissingAttendanceRecords(AttendanceLocation location) {
+        if (location == null || location.getTeacherId() == null || location.getEndTime() == null) {
+            return;
+        }
+        LocalDate attendanceDate = location.getEndTime().toLocalDate();
+        QueryWrapper<Student> studentQuery = new QueryWrapper<>();
+        studentQuery.eq("teacher_id", location.getTeacherId());
+        studentQuery.eq("is_deleted", 0);
+        List<Student> students = studentMapper.selectList(studentQuery);
+        for (Student student : students) {
+            if (!shouldGenerateAbsentRecord(student, attendanceDate)) {
+                continue;
+            }
+            CampusCard campusCard = getActiveStudentCard(student.getId());
+            if (campusCard == null) {
+                continue;
+            }
+            try {
+                studentService.ensureStudentProfileComplete(student);
+            } catch (RuntimeException ignored) {
+                continue;
+            }
+            if (hasLocationRecord(campusCard.getId(), location.getId(), attendanceDate)) {
+                continue;
+            }
+            AttendanceRecord absentRecord = new AttendanceRecord();
+            absentRecord.setCardId(campusCard.getId());
+            absentRecord.setLocationId(location.getId());
+            absentRecord.setStatus("缺勤");
+            absentRecord.setActualLocation("未打卡");
+            absentRecord.setAttendanceType("CAMPUS_LOCATION");
+            absentRecord.setRecordTime(location.getEndTime());
+            absentRecord.setIsDeleted(0);
+            attendanceRecordMapper.insert(absentRecord);
+        }
+    }
+
+    private boolean shouldGenerateAbsentRecord(Student student, LocalDate attendanceDate) {
+        if (student == null || student.getId() == null) {
+            return false;
+        }
+        String attendanceMode = normalizeAttendanceMode(student.getAttendanceMode());
+        String attendanceStatus = normalizeAttendanceStatus(student.getAttendanceStatus());
+        if (!"CAMPUS".equals(attendanceMode) || "INTERNSHIP".equals(attendanceStatus) || "LEAVE".equals(attendanceStatus)) {
+            return false;
+        }
+        return getActiveApprovedLeaveApplicationByStudentId(student.getId(), attendanceDate) == null;
+    }
+
+    private CampusCard getActiveStudentCard(Long studentId) {
+        QueryWrapper<CampusCard> cardQuery = new QueryWrapper<>();
+        cardQuery.eq("user_id", studentId);
+        cardQuery.eq("user_type", "student");
+        cardQuery.eq("status", 1);
+        cardQuery.eq("is_deleted", 0);
+        cardQuery.last("LIMIT 1");
+        return campusCardMapper.selectOne(cardQuery);
+    }
+
+    private boolean hasLocationRecord(Long cardId, Long locationId, LocalDate attendanceDate) {
+        QueryWrapper<AttendanceRecord> recordQuery = new QueryWrapper<>();
+        recordQuery.eq("card_id", cardId);
+        recordQuery.eq("location_id", locationId);
+        recordQuery.ge("record_time", attendanceDate.atStartOfDay());
+        recordQuery.lt("record_time", attendanceDate.plusDays(1).atStartOfDay());
+        recordQuery.eq("is_deleted", 0);
+        return attendanceRecordMapper.selectCount(recordQuery) > 0;
+    }
+
+    private AttendanceApplication getActiveApprovedLeaveApplicationByStudentId(Long studentId, LocalDate date) {
+        QueryWrapper<AttendanceApplication> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("student_id", studentId);
+        queryWrapper.eq("application_type", "LEAVE");
+        queryWrapper.eq("status", "APPROVED");
+        queryWrapper.le("start_date", date);
+        queryWrapper.ge("end_date", date);
+        queryWrapper.eq("is_deleted", 0);
+        queryWrapper.orderByDesc("create_time");
+        queryWrapper.last("LIMIT 1");
+        return attendanceApplicationMapper.selectOne(queryWrapper);
+    }
+
+    private void validateStudentLocationPermission(CampusCard campusCard, Student student, AttendanceLocation location) {
+        if (campusCard == null || !"student".equalsIgnoreCase(campusCard.getUserType())) {
+            return;
+        }
+        if (student == null || student.getTeacherId() == null) {
+            throw new RuntimeException("当前学生未绑定负责老师，暂不能打卡");
+        }
+        if (location.getTeacherId() == null || !student.getTeacherId().equals(location.getTeacherId())) {
+            throw new RuntimeException("当前打卡位置不属于负责老师发布，无法打卡");
+        }
+    }
+
+    private String normalizeAttendanceMode(String attendanceMode) {
+        if (attendanceMode == null || attendanceMode.trim().isEmpty()) {
+            return "CAMPUS";
+        }
+        return attendanceMode.trim().toUpperCase();
+    }
+
+    private String normalizeAttendanceStatus(String attendanceStatus) {
+        if (attendanceStatus == null || attendanceStatus.trim().isEmpty()) {
+            return "ON_CAMPUS";
+        }
+        return attendanceStatus.trim().toUpperCase();
     }
 
     private void validateActiveLocation(AttendanceLocation location) {

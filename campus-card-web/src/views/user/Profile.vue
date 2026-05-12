@@ -320,7 +320,7 @@
           </div>
         </el-tab-pane>
         
-        <el-tab-pane label="考勤打卡" name="attendance">
+        <el-tab-pane label="考勤打卡" name="attendance" v-if="userInfo.role === 'student'">
           <div class="attendance-section">
             <el-alert
               v-if="userInfo.role === 'student' && !studentProfileComplete"
@@ -330,123 +330,6 @@
               :closable="false"
               style="margin-bottom: 20px"
             />
-            <el-card shadow="hover" class="attendance-card">
-              <template #header>
-                <div class="card-header">
-                  <span>考勤申报</span>
-                </div>
-              </template>
-              <el-tabs v-model="applicationTab">
-                <el-tab-pane label="外出实习申报" name="internship">
-                  <el-form :model="internshipApplicationForm" label-width="90px">
-                    <el-form-item label="实习单位">
-                      <el-input v-model="internshipApplicationForm.company" placeholder="请输入实习单位" />
-                    </el-form-item>
-                    <el-form-item label="开始日期">
-                      <el-date-picker
-                        v-model="internshipApplicationForm.startDate"
-                        type="date"
-                        placeholder="选择开始日期"
-                        :disabled-date="disabledPastDate"
-                        style="width: 100%"
-                      />
-                    </el-form-item>
-                    <el-form-item label="说明">
-                      <RichTextEditor
-                        v-model="internshipApplicationForm.reason"
-                        placeholder="请填写实习岗位、地点、指导老师要求，或上传相关资料"
-                      />
-                    </el-form-item>
-                    <el-form-item>
-                      <el-button
-                        type="primary"
-                        @click="handleSubmitInternshipApplication"
-                        :disabled="!studentProfileComplete || hasActiveInternshipApplication || submittingInternshipApplication"
-                        :loading="submittingInternshipApplication"
-                      >
-                        提交实习申报
-                      </el-button>
-                    </el-form-item>
-                  </el-form>
-                </el-tab-pane>
-                <el-tab-pane label="请假申请" name="leave">
-                  <el-form :model="leaveApplicationForm" label-width="90px">
-                    <el-form-item label="请假日期">
-                      <el-date-picker
-                        v-model="leaveApplicationForm.dateRange"
-                        type="daterange"
-                        range-separator="至"
-                        start-placeholder="开始日期"
-                        end-placeholder="结束日期"
-                        :disabled-date="disabledPastDate"
-                        style="width: 100%"
-                      />
-                    </el-form-item>
-                    <el-form-item label="请假原因">
-                      <RichTextEditor
-                        v-model="leaveApplicationForm.reason"
-                        placeholder="请输入请假原因，或上传证明资料"
-                      />
-                    </el-form-item>
-                    <el-form-item v-if="hasOverlappingLeaveApplication">
-                      <el-alert
-                        title="已有待审核或已通过的请假申请，请勿重复提交。"
-                        type="warning"
-                        show-icon
-                        :closable="false"
-                      />
-                    </el-form-item>
-                    <el-form-item>
-                      <el-button
-                        type="primary"
-                        @click="handleSubmitLeaveApplication"
-                        :disabled="!studentProfileComplete || hasOverlappingLeaveApplication || submittingLeaveApplication"
-                        :loading="submittingLeaveApplication"
-                      >
-                        提交请假申请
-                      </el-button>
-                    </el-form-item>
-                  </el-form>
-                </el-tab-pane>
-              </el-tabs>
-              <el-table :data="attendanceApplications" border style="width: 100%; margin-top: 16px" v-if="attendanceApplications.length">
-                <el-table-column label="申报类型" width="110">
-                  <template #default="{ row }">
-                    {{ row.applicationType === 'LEAVE' ? '请假' : '外出实习' }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="日期" width="210">
-                  <template #default="{ row }">
-                    {{ row.startDate || '-' }}<span v-if="row.endDate"> 至 {{ row.endDate }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="说明/资料" min-width="120">
-                  <template #default="{ row }">
-                    <el-button
-                      v-if="hasRichTextContent(row.reason)"
-                      size="small"
-                      link
-                      type="primary"
-                      @click="openApplicationReason(row)"
-                    >
-                      查看
-                    </el-button>
-                    <span v-else>未填写</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="状态" width="100">
-                  <template #default="{ row }">
-                    <el-tag :type="getApplicationStatusType(row.status)">
-                      {{ getApplicationStatusText(row.status) }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-              </el-table>
-              <el-dialog v-model="applicationReasonDialogVisible" title="申报说明/资料" width="640px">
-                <RichTextPreview :html="currentApplicationReason" />
-              </el-dialog>
-            </el-card>
-
             <el-card shadow="hover" class="attendance-card">
               <template #header>
                 <div class="card-header">
@@ -482,6 +365,18 @@
                   <el-icon class="is-loading"><Loading /></el-icon>
                   <span>正在获取位置信息...</span>
                 </div>
+                <el-steps
+                  v-if="checkingIn || checkinStep !== 'idle'"
+                  :active="checkinStepIndex"
+                  finish-status="success"
+                  class="checkin-steps"
+                  simple
+                >
+                  <el-step title="定位" />
+                  <el-step title="范围校验" />
+                  <el-step title="提交" />
+                  <el-step title="完成" />
+                </el-steps>
                 <template v-if="!isInternshipAttendance || isLeaveAttendance">
                   <el-form-item label="打卡位置" style="margin-top: 20px; width: 100%">
                     <el-select v-model="selectedLocation" :placeholder="isLeaveAttendance ? '请选择老师下发的考勤位置（可选）' : '请选择打卡位置'" style="width: 100%" clearable>
@@ -598,6 +493,144 @@
                 @current-change="handleAttendanceCurrentChange"
                 style="margin-top: 20px; justify-content: flex-end"
               />
+            </el-card>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="实习请假" name="attendance-application" v-if="userInfo.role === 'student'">
+          <div class="attendance-section">
+            <el-alert
+              v-if="!studentProfileComplete"
+              :title="studentProfileIncompleteMessage"
+              type="warning"
+              show-icon
+              :closable="false"
+              style="margin-bottom: 20px"
+            />
+            <el-card shadow="hover" class="attendance-card">
+              <template #header>
+                <div class="card-header">
+                  <span>实习与请假申报</span>
+                </div>
+              </template>
+              <el-tabs v-model="applicationTab">
+                <el-tab-pane label="外出实习申报" name="internship">
+                  <el-form :model="internshipApplicationForm" label-width="90px">
+                    <el-form-item label="实习单位">
+                      <el-input v-model="internshipApplicationForm.company" placeholder="请输入实习单位" />
+                    </el-form-item>
+                    <el-form-item label="开始日期">
+                      <el-date-picker
+                        v-model="internshipApplicationForm.startDate"
+                        type="date"
+                        placeholder="选择开始日期"
+                        :disabled-date="disabledPastDate"
+                        style="width: 100%"
+                      />
+                    </el-form-item>
+                    <el-form-item label="说明">
+                      <RichTextEditor
+                        v-model="internshipApplicationForm.reason"
+                        placeholder="请填写实习岗位、地点、指导老师要求，或上传相关资料"
+                      />
+                    </el-form-item>
+                    <el-form-item>
+                      <el-button
+                        type="primary"
+                        @click="handleSubmitInternshipApplication"
+                        :disabled="!studentProfileComplete || hasActiveInternshipApplication || submittingInternshipApplication"
+                        :loading="submittingInternshipApplication"
+                      >
+                        提交实习申报
+                      </el-button>
+                    </el-form-item>
+                  </el-form>
+                </el-tab-pane>
+                <el-tab-pane label="请假申请" name="leave">
+                  <el-form :model="leaveApplicationForm" label-width="90px">
+                    <el-form-item label="请假日期">
+                      <el-date-picker
+                        v-model="leaveApplicationForm.dateRange"
+                        type="daterange"
+                        range-separator="至"
+                        start-placeholder="开始日期"
+                        end-placeholder="结束日期"
+                        :disabled-date="disabledPastDate"
+                        style="width: 100%"
+                      />
+                    </el-form-item>
+                    <el-form-item label="请假原因">
+                      <RichTextEditor
+                        v-model="leaveApplicationForm.reason"
+                        placeholder="请输入请假原因，或上传证明资料"
+                      />
+                    </el-form-item>
+                    <el-form-item v-if="hasOverlappingLeaveApplication">
+                      <el-alert
+                        title="已有待审核或已通过的请假申请，请勿重复提交。"
+                        type="warning"
+                        show-icon
+                        :closable="false"
+                      />
+                    </el-form-item>
+                    <el-form-item>
+                      <el-button
+                        type="primary"
+                        @click="handleSubmitLeaveApplication"
+                        :disabled="!studentProfileComplete || hasOverlappingLeaveApplication || submittingLeaveApplication"
+                        :loading="submittingLeaveApplication"
+                      >
+                        提交请假申请
+                      </el-button>
+                    </el-form-item>
+                  </el-form>
+                </el-tab-pane>
+              </el-tabs>
+            </el-card>
+
+            <el-card shadow="hover" class="attendance-card">
+              <template #header>
+                <div class="card-header">
+                  <span>申报记录</span>
+                </div>
+              </template>
+              <el-table :data="attendanceApplications" border style="width: 100%" v-if="attendanceApplications.length">
+                <el-table-column label="申报类型" width="110">
+                  <template #default="{ row }">
+                    {{ row.applicationType === 'LEAVE' ? '请假' : '外出实习' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="日期" width="210">
+                  <template #default="{ row }">
+                    {{ row.startDate || '-' }}<span v-if="row.endDate"> 至 {{ row.endDate }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="说明/资料" min-width="120">
+                  <template #default="{ row }">
+                    <el-button
+                      v-if="hasRichTextContent(row.reason)"
+                      size="small"
+                      link
+                      type="primary"
+                      @click="openApplicationReason(row)"
+                    >
+                      查看
+                    </el-button>
+                    <span v-else>未填写</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="状态" width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="getApplicationStatusType(row.status)">
+                      {{ getApplicationStatusText(row.status) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-empty v-else description="暂无申报记录" />
+              <el-dialog v-model="applicationReasonDialogVisible" title="申报说明/资料" width="640px">
+                <RichTextPreview :html="currentApplicationReason" />
+              </el-dialog>
             </el-card>
           </div>
         </el-tab-pane>
@@ -800,9 +833,7 @@
           </el-form-item>
           <el-form-item label="充值方式" required>
             <el-select v-model="rechargeFormDialog.rechargeType">
-              <el-option label="微信" value="微信" />
               <el-option label="支付宝" value="支付宝" />
-              <el-option label="现金" value="现金" v-if="userInfo.role === 'admin'" />
             </el-select>
           </el-form-item>
         </el-form>
@@ -814,37 +845,33 @@
         </template>
       </el-dialog>
       
-      <!-- 模拟扫码支付对话框 -->
+      <!-- 支付宝支付状态对话框 -->
       <el-dialog
         v-model="showScanDialog"
-        title="扫码支付"
+        title="支付宝沙箱支付"
         width="400px"
       >
         <div class="scan-container">
-          <div class="scan-qr-code" v-if="scanQRCodeUrl">
-            <img :src="scanQRCodeUrl" alt="支付二维码" />
-            <p class="scan-tip">请使用{{ rechargeFormDialog.rechargeType }}扫描二维码</p>
+          <div class="scan-qr-code">
+            <p class="scan-tip">已打开支付宝沙箱收银台，请在支付完成后返回本页面查询状态</p>
             <div class="scan-status" :class="scanStatus">
               <el-icon :size="16">
-                <component :is="scanStatus === 'waiting' ? 'Loading' : scanStatus === 'scanning' ? 'Loading' : scanStatus === 'success' ? 'Check' : 'Warning'" />
+                <component :is="scanStatus === 'success' ? 'Check' : scanStatus === 'failed' ? 'Warning' : 'Loading'" />
               </el-icon>
               <span>
-                {{ scanStatus === 'waiting' ? '等待扫码...' : 
-                   scanStatus === 'scanning' ? '扫码中...' : 
-                   scanStatus === 'success' ? '支付成功！' : 
-                   scanStatus === 'failed' ? '支付超时' : '' }}
+                {{ scanStatus === 'waiting' ? '等待支付结果...' :
+                   scanStatus === 'querying' ? '正在查询支付宝订单...' :
+                   scanStatus === 'success' ? '支付成功，已入账！' :
+                   scanStatus === 'failed' ? '支付未完成或查询失败' : '' }}
               </span>
             </div>
-          </div>
-          <div class="scan-loading" v-else>
-            <el-icon class="is-loading"><loading /></el-icon>
-            <span>正在生成支付二维码...</span>
           </div>
         </div>
         <template #footer>
           <span class="dialog-footer">
-            <el-button @click="cancelScan">取消支付</el-button>
-            <el-button type="primary" v-if="scanStatus === 'failed'" @click="generateScanQRCode">重新生成</el-button>
+            <el-button @click="cancelScan">关闭</el-button>
+            <el-button @click="reopenAlipayPage" :disabled="!currentAlipayFormHtml">重新打开收银台</el-button>
+            <el-button type="primary" @click="checkAlipayRechargeStatus" :loading="scanQuerying">查询支付结果</el-button>
           </span>
         </template>
       </el-dialog>
@@ -853,8 +880,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElDialog, ElForm, ElFormItem, ElSelect, ElOption, ElInput, ElDatePicker, ElButton, ElIcon } from 'element-plus'
 import { Loading, ArrowRightBold, ArrowLeftBold, Check, Warning, Position } from '@element-plus/icons-vue'
 import { getStudentByNo, updateStudent } from '@/api/student'
@@ -864,13 +891,14 @@ import { getConsumeList } from '@/api/consume'
 import { getBorrowList, getBookList, submitBorrowApplication, getActiveBorrowCount, getBorrowApplications, getBorrowRestrictionStatus, returnBook } from '@/api/book'
 import { getMyAccessRecords, getAccessPoints, createQRAccess } from '@/api/access'
 import { getAttendanceList, createAttendance, getActiveLocations, submitInternshipApplication, submitLeaveApplication, getMyAttendanceApplications } from '@/api/attendance'
-import { getRechargeList, recharge, rechargeByCardNo } from '@/api/recharge'
+import { getRechargeList, createAlipayPagePay, queryAlipayRechargeStatus } from '@/api/recharge'
 import { changePassword } from '@/api/admin'
 import { getCollegeMajorOptions } from '@/api/collegeMajor'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import RichTextPreview from '@/components/RichTextPreview.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 const activeTab = ref('info')
 const userInfo = reactive({
@@ -944,12 +972,14 @@ const rechargePagination = reactive({
 const rechargeFormDialog = reactive({
   cardNo: '',
   amount: 100,
-  rechargeType: '微信'
+  rechargeType: '支付宝'
 })
-// 模拟扫码支付相关
-const scanQRCodeUrl = ref('')
-const scanStatus = ref('waiting') // waiting, success, failed
+// 支付宝支付相关
+const currentAlipayOutTradeNo = ref('')
+const currentAlipayFormHtml = ref('')
+const scanStatus = ref('waiting') // waiting, querying, success, failed
 const scanPolling = ref(null)
+const scanQuerying = ref(false)
 
 const consumeForm = reactive({
   startDate: '',
@@ -1613,13 +1643,22 @@ const locationError = ref('')
 const currentLatitude = ref(null)
 const currentLongitude = ref(null)
 const checkingIn = ref(false)
+const checkinStep = ref('idle')
+const checkinStepIndex = computed(() => {
+  const map = {
+    idle: 0,
+    locating: 0,
+    validating: 1,
+    submitting: 2,
+    refreshing: 3,
+    done: 4
+  }
+  return map[checkinStep.value] || 0
+})
 const isInternshipAttendance = computed(() => userInfo.role === 'student' && userInfo.attendanceMode === 'INTERNSHIP')
 const isLeaveAttendance = computed(() => userInfo.role === 'student' && userInfo.attendanceStatus === 'LEAVE')
 const canSubmitAttendance = computed(() => {
   if (!studentProfileComplete.value) {
-    return false
-  }
-  if (!currentLocation.value || !currentLatitude.value || !currentLongitude.value) {
     return false
   }
   if (isLeaveAttendance.value) {
@@ -1715,6 +1754,15 @@ const getBrowserLocation = () => {
   })
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+const applyBrowserPosition = (position) => {
+  currentLatitude.value = position.coords.latitude
+  currentLongitude.value = position.coords.longitude
+  currentLocation.value = `纬度: ${currentLatitude.value.toFixed(4)}, 经度: ${currentLongitude.value.toFixed(4)}`
+  locationError.value = ''
+}
+
 // 检查是否在打卡范围内
 const isInCheckinArea = () => {
   if (!currentLatitude.value || !currentLongitude.value || !selectedLocation.value) {
@@ -1736,9 +1784,7 @@ const getCurrentLocation = () => {
   locationError.value = ''
   getBrowserLocation()
     .then((position) => {
-      currentLatitude.value = position.coords.latitude
-      currentLongitude.value = position.coords.longitude
-      currentLocation.value = `纬度: ${currentLatitude.value.toFixed(4)}, 经度: ${currentLongitude.value.toFixed(4)}`
+      applyBrowserPosition(position)
     })
     .catch((error) => {
       locationError.value = error.message || '获取位置失败，请检查位置权限设置'
@@ -1760,22 +1806,11 @@ const handleCheckin = async () => {
     return
   }
   
-  if (!currentLatitude.value || !currentLongitude.value) {
-    ElMessage.error('无法获取位置信息，请检查位置权限')
-    return
-  }
-  
   if (!isInternshipAttendance.value && !isLeaveAttendance.value && !selectedLocation.value) {
     ElMessage.error('请选择打卡位置')
     return
   }
   
-  // 检查是否在打卡范围内
-  if (!isInternshipAttendance.value && !isLeaveAttendance.value && !isInCheckinArea()) {
-    ElMessage.error('您不在允许的打卡范围内，请前往指定地点打卡')
-    return
-  }
-
   if (isInternshipAttendance.value && !isLeaveAttendance.value) {
     if (!internshipForm.company) {
       ElMessage.error('请输入实习单位')
@@ -1788,7 +1823,23 @@ const handleCheckin = async () => {
   }
   
   checkingIn.value = true
+  const startTime = Date.now()
   try {
+    checkinStep.value = 'locating'
+    const position = await getBrowserLocation()
+    applyBrowserPosition(position)
+    await sleep(180)
+
+    checkinStep.value = 'validating'
+    await sleep(180)
+    if (!currentLatitude.value || !currentLongitude.value) {
+      throw new Error('无法获取位置信息，请检查位置权限')
+    }
+    if (!isInternshipAttendance.value && !isLeaveAttendance.value && !isInCheckinArea()) {
+      throw new Error('您不在允许的打卡范围内，请前往指定地点打卡')
+    }
+
+    checkinStep.value = 'submitting'
     const res = await createAttendance({
       card_id: cardInfo.id,
       location_id: isInternshipAttendance.value ? undefined : selectedLocation.value?.id,
@@ -1803,12 +1854,19 @@ const handleCheckin = async () => {
     })
     
     if (res.code === 0) {
-      ElMessage.success('打卡成功！')
       if (isInternshipAttendance.value) {
         internshipForm.log = ''
       }
-      // 重新加载考勤记录
-      loadAttendanceData()
+      checkinStep.value = 'refreshing'
+      await loadAttendanceData()
+      await sleep(Math.max(0, 800 - (Date.now() - startTime)))
+      checkinStep.value = 'done'
+      ElMessage.success('打卡成功！')
+      window.setTimeout(() => {
+        if (!checkingIn.value) {
+          checkinStep.value = 'idle'
+        }
+      }, 1200)
     } else {
       ElMessage.error(res.message || '打卡失败')
     }
@@ -1819,20 +1877,28 @@ const handleCheckin = async () => {
       ElMessage.error(error.response.data.msg)
     } else if (error.message && error.message.includes('今日已在该位置打卡')) {
       ElMessage.error('今日已在该位置打卡，请勿重复打卡')
+    } else if (error.message) {
+      ElMessage.error(error.message)
     } else {
       ElMessage.error('打卡失败，请稍后重试')
     }
   } finally {
     checkingIn.value = false
+    if (checkinStep.value !== 'done') {
+      checkinStep.value = 'idle'
+    }
   }
 }
 
 // 加载有效打卡位置
 const loadActiveLocations = async () => {
   try {
-    const res = await getActiveLocations()
+    const res = await getActiveLocations({ card_id: cardInfo.id })
     if (res.code === 0) {
       checkinLocations.value = res.data || []
+      if (selectedLocation.value && !checkinLocations.value.some(location => location.id === selectedLocation.value.id)) {
+        selectedLocation.value = null
+      }
     }
   } catch (error) {
     console.error('加载打卡位置失败:', error)
@@ -2169,122 +2235,142 @@ const loadRechargeData = async () => {
 }
 
 const handleRecharge = async () => {
+  let payWindow = null
   try {
-    if (!cardInfo.id || !rechargeFormDialog.amount || !rechargeFormDialog.rechargeType) {
+    if (!cardInfo.id || !rechargeFormDialog.amount) {
       ElMessage.error('请填写完整的充值信息')
       return
     }
 
-    // 显示扫码支付对话框
+    payWindow = window.open('', '_blank')
+    if (payWindow) {
+      payWindow.document.write('<p style="font-family: sans-serif; padding: 24px;">正在创建支付宝沙箱订单...</p>')
+    }
+
+    const userStr = localStorage.getItem('user')
+    const user = userStr ? JSON.parse(userStr) : null
+    const res = await createAlipayPagePay({
+      cardId: cardInfo.id,
+      amount: rechargeFormDialog.amount,
+      operatorId: user ? user.id : 1,
+      operatorName: user ? user.username : '用户'
+    })
+
+    if (res.code !== 0 || !res.data) {
+      if (payWindow) {
+        payWindow.close()
+      }
+      ElMessage.error(res.msg || '支付宝支付订单创建失败')
+      return
+    }
+
+    currentAlipayOutTradeNo.value = res.data.outTradeNo
+    currentAlipayFormHtml.value = res.data.formHtml
+    scanStatus.value = 'waiting'
     showRechargeDialog.value = false
     showScanDialog.value = true
-    
-    // 生成支付二维码
-    generateScanQRCode()
+    openAlipayForm(currentAlipayFormHtml.value, payWindow)
+    startAlipayPolling()
   } catch (error) {
+    if (payWindow) {
+      payWindow.close()
+    }
     console.error('充值操作失败:', error)
     ElMessage.error('充值操作失败，请稍后重试')
   }
 }
 
-const generateScanQRCode = () => {
-  scanStatus.value = 'waiting'
-  
-  // 生成二维码（包含必要的参数）
-  const scanCode = Math.random().toString(36).substring(2, 15)
-  const cardId = cardInfo.id
-  const amount = rechargeFormDialog.amount
-  const rechargeType = rechargeFormDialog.rechargeType
-  
-  // 构建二维码内容，包含必要的参数
-  const scanData = JSON.stringify({
-    card_id: cardId,
-    amount: amount,
-    recharge_type: rechargeType,
-    scan_code: scanCode
-  })
-  
-  scanQRCodeUrl.value = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(scanData)}`
-  
-  // 5秒后提示扫码中
-  setTimeout(() => {
-    if (showScanDialog.value && scanStatus.value === 'waiting') {
-      scanStatus.value = 'scanning'
-    }
-  }, 5000)
-  
-  // 模拟二维码有效期为15秒
-  setTimeout(() => {
-    if (showScanDialog.value && (scanStatus.value === 'waiting' || scanStatus.value === 'scanning')) {
-      scanQRCodeUrl.value = ''
-      scanStatus.value = 'failed'
-      ElMessage.warning('支付超时，请重新尝试')
-    }
-  }, 15000)
-  
-  // 开始轮询，检查支付状态
-  startScanPolling(scanCode)
-}
-
-const startScanPolling = (scanCode) => {
-  // 清除之前的轮询
-  if (scanPolling.value) {
-    clearTimeout(scanPolling.value)
+const openAlipayForm = (formHtml, existingWindow = null) => {
+  const payWindow = existingWindow || window.open('', '_blank')
+  if (!payWindow) {
+    ElMessage.warning('浏览器拦截了支付宝收银台窗口，请允许弹窗后点击重新打开')
+    return
   }
-  
-  // 10秒后模拟支付成功
-  scanPolling.value = setTimeout(async () => {
-    if (showScanDialog.value) {
-      // 模拟支付成功
-      scanStatus.value = 'success'
-      
-      // 调用后端充值接口
-      try {
-        console.log('充值参数:', {
-          card_id: cardInfo.id,
-          amount: rechargeFormDialog.amount,
-          recharge_type: rechargeFormDialog.rechargeType
-        })
-        
-        const response = await recharge({
-          card_id: cardInfo.id,
-          amount: rechargeFormDialog.amount,
-          recharge_type: rechargeFormDialog.rechargeType
-        })
-        
-        console.log('充值响应:', response)
-        
-        if (response.code === 0) {
-          // 显示成功消息
-          ElMessage.success(`充值成功！已为您的校园卡充值 ${rechargeFormDialog.amount} 元`)
-          
-          // 重新加载校园卡信息和充值记录
-          await loadCardInfo()
-          loadRechargeData()
-        } else {
-          ElMessage.error('充值失败：' + response.message)
-        }
-      } catch (error) {
-        console.error('调用充值接口失败:', error)
-        ElMessage.error('充值失败，请稍后重试')
-      }
-      
-      // 2秒后关闭对话框
-      setTimeout(() => {
-        showScanDialog.value = false
-        scanQRCodeUrl.value = ''
-      }, 2000)
-    }
-  }, 10000)
+  payWindow.document.open()
+  payWindow.document.write(formHtml)
+  payWindow.document.close()
 }
 
-const cancelScan = () => {
+const reopenAlipayPage = () => {
+  if (!currentAlipayFormHtml.value) {
+    ElMessage.warning('暂无可打开的支付宝订单')
+    return
+  }
+  openAlipayForm(currentAlipayFormHtml.value)
+}
+
+const checkAlipayRechargeStatus = async (silent = false) => {
+  if (!currentAlipayOutTradeNo.value) {
+    ElMessage.warning('暂无支付宝充值订单')
+    return
+  }
+  if (scanQuerying.value) {
+    return
+  }
+
+  scanQuerying.value = true
+  scanStatus.value = 'querying'
+  try {
+    const res = await queryAlipayRechargeStatus(currentAlipayOutTradeNo.value)
+    if (res.code === 0 && res.data) {
+      if (res.data.settled) {
+        scanStatus.value = 'success'
+        ElMessage.success(`充值成功！已为您的校园卡充值 ${res.data.amount} 元`)
+        await loadCardInfo()
+        loadRechargeData()
+        stopAlipayPolling()
+        setTimeout(() => {
+          showScanDialog.value = false
+        }, 1500)
+      } else if (res.data.status === 'CLOSED') {
+        scanStatus.value = 'failed'
+        ElMessage.warning(res.data.message || '支付宝交易已关闭')
+        stopAlipayPolling()
+      } else {
+        scanStatus.value = 'waiting'
+        if (!silent) {
+          ElMessage.info(res.data.message || '支付尚未完成')
+        }
+      }
+    }
+  } catch (error) {
+    scanStatus.value = 'waiting'
+    if (!silent) {
+      ElMessage.warning('支付宝订单查询超时或失败，请稍后重试')
+    }
+    console.error('查询支付宝订单失败:', error)
+  } finally {
+    scanQuerying.value = false
+  }
+}
+
+const startAlipayPolling = () => {
+  stopAlipayPolling()
+  let pollingCount = 0
+  const poll = async () => {
+    if (!showScanDialog.value || pollingCount >= 24 || scanStatus.value === 'success' || scanStatus.value === 'failed') {
+      stopAlipayPolling()
+      return
+    }
+    pollingCount += 1
+    await checkAlipayRechargeStatus(true)
+    if (scanPolling.value !== null && showScanDialog.value && scanStatus.value !== 'success' && scanStatus.value !== 'failed') {
+      scanPolling.value = setTimeout(poll, 5000)
+    }
+  }
+  scanPolling.value = setTimeout(poll, 5000)
+}
+
+const stopAlipayPolling = () => {
   if (scanPolling.value) {
     clearTimeout(scanPolling.value)
     scanPolling.value = null
   }
+}
+
+const cancelScan = () => {
+  stopAlipayPolling()
   showScanDialog.value = false
-  scanQRCodeUrl.value = ''
   scanStatus.value = 'waiting'
 }
 
@@ -2309,16 +2395,14 @@ watch(() => showRechargeDialog.value, (newVal) => {
   if (newVal) {
     rechargeFormDialog.cardNo = cardInfo.cardNo
     rechargeFormDialog.amount = 100
-    rechargeFormDialog.rechargeType = '微信'
+    rechargeFormDialog.rechargeType = '支付宝'
   }
 })
 
-// 监听扫码支付对话框的显示
+// 监听支付宝支付对话框的显示
 watch(() => showScanDialog.value, (newVal) => {
-  if (!newVal && scanPolling.value) {
-    clearInterval(scanPolling.value)
-    scanPolling.value = null
-    scanQRCodeUrl.value = ''
+  if (!newVal) {
+    stopAlipayPolling()
     scanStatus.value = 'waiting'
   }
 })
@@ -2336,6 +2420,20 @@ watch(() => showQRCodeDialog.value, (newVal) => {
   }
 })
 
+const handleAlipayReturnFromQuery = async () => {
+  const outTradeNo = route.query.alipayOutTradeNo
+  if (!outTradeNo) {
+    return
+  }
+  currentAlipayOutTradeNo.value = Array.isArray(outTradeNo) ? outTradeNo[0] : outTradeNo
+  currentAlipayFormHtml.value = ''
+  showScanDialog.value = true
+  if (route.query.alipayReturn === 'failed') {
+    ElMessage.warning('支付宝回跳验签未通过，请以订单查询结果为准')
+  }
+  await checkAlipayRechargeStatus()
+}
+
 onMounted(async () => {
   await loadCollegeMajorOptions()
   await loadUserInfo()
@@ -2351,6 +2449,11 @@ onMounted(async () => {
     loadBorrowData()
     loadBookData()
   }
+  await handleAlipayReturnFromQuery()
+})
+
+onUnmounted(() => {
+  stopAlipayPolling()
 })
 </script>
 
@@ -2510,6 +2613,11 @@ onMounted(async () => {
   max-width: 480px;
   margin: 20px auto 0;
   text-align: left;
+}
+
+.checkin-steps {
+  margin: 0 auto 20px;
+  max-width: 520px;
 }
 
 .location-info {

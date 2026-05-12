@@ -465,10 +465,22 @@
           </el-select>
         </el-form-item>
         <el-form-item label="开始日期">
-          <el-date-picker v-model="scheduleForm.startDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择开始日期" />
+          <el-date-picker
+            v-model="scheduleForm.startDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择开始日期"
+            :disabled-date="disabledPastDate"
+          />
         </el-form-item>
         <el-form-item label="结束日期">
-          <el-date-picker v-model="scheduleForm.endDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择结束日期" />
+          <el-date-picker
+            v-model="scheduleForm.endDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择结束日期"
+            :disabled-date="disabledScheduleEndDate"
+          />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="scheduleForm.status" placeholder="请选择状态">
@@ -489,6 +501,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   getCommuteList,
   getRouteList, addRoute, updateRoute, deleteRoute,
@@ -1126,6 +1139,19 @@ const handleSaveSchedule = async () => {
     formData.departureTime = formatTimeValue(formData.departureTime)
     formData.startDate = formatDateValue(formData.startDate)
     formData.endDate = formatDateValue(formData.endDate)
+
+    if (!formData.startDate) {
+      ElMessage.error('请选择开始日期')
+      return
+    }
+    if (isBeforeToday(formData.startDate)) {
+      ElMessage.error('开始日期不能早于今天')
+      return
+    }
+    if (formData.endDate && formData.endDate < formData.startDate) {
+      ElMessage.error('结束日期不能早于开始日期')
+      return
+    }
     
     let res
     if (formData.id) {
@@ -1173,6 +1199,36 @@ const formatDateValue = (value) => {
     return `${year}-${month}-${day}`
   }
   return value
+}
+
+const getTodayStart = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+const isBeforeToday = (value) => {
+  if (!value) {
+    return false
+  }
+  const date = new Date(value)
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  return dateStart.getTime() < getTodayStart().getTime()
+}
+
+const disabledPastDate = (time) => {
+  return isBeforeToday(time)
+}
+
+const disabledScheduleEndDate = (time) => {
+  if (disabledPastDate(time)) {
+    return true
+  }
+  if (!scheduleForm.startDate) {
+    return false
+  }
+  const startDate = new Date(scheduleForm.startDate)
+  const startDateStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+  return time.getTime() < startDateStart.getTime()
 }
 
 const handleDeleteSchedule = async (id) => {

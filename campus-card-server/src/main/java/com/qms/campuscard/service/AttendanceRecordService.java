@@ -17,4 +17,6 @@ public interface AttendanceRecordService {
     Map<String, Long> getAttendanceSummary(String startDate, String endDate);
     
     IPage<AttendanceRecord> getAttendanceRecordsByLocationId(Long locationId, Integer page, Integer size);
+
+    void generateMissingAttendanceRecords();
 }

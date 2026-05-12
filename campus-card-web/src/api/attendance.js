@@ -75,8 +75,8 @@ export const getAllLocations = (params) => {
   return request.get('/attendance/location/list', { params })
 }
 
-export const getActiveLocations = () => {
-  return request.get('/attendance/location/active')
+export const getActiveLocations = (params) => {
+  return request.get('/attendance/location/active', { params })
 }
 
 export const getAttendanceRecordsByLocationId = (locationId, params) => {
