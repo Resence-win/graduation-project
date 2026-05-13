@@ -2,6 +2,9 @@
 -- 校园一卡通系统数据库初始化脚本（最终版）
 -- ========================================
 
+CREATE SCHEMA IF NOT EXISTS campus_card;
+SET search_path TO campus_card;
+
 -- ========================
 -- 1. 学生表
 -- ========================
@@ -288,7 +291,10 @@ CREATE TABLE consume_record (
     balance_after NUMERIC(10,2),
     status INT DEFAULT 1,
     consume_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    product_id BIGINT,
+    product_name VARCHAR(100),
+    quantity INT DEFAULT 1
 );
 
 COMMENT ON TABLE consume_record IS '消费记录表';
@@ -300,6 +306,9 @@ COMMENT ON COLUMN consume_record.balance_after IS '消费后余额';
 COMMENT ON COLUMN consume_record.status IS '状态';
 COMMENT ON COLUMN consume_record.consume_time IS '消费时间';
 COMMENT ON COLUMN consume_record.is_deleted IS '是否删除';
+COMMENT ON COLUMN consume_record.product_id IS '商品ID';
+COMMENT ON COLUMN consume_record.product_name IS '商品名称快照';
+COMMENT ON COLUMN consume_record.quantity IS '消费数量';
 
 -- ========================
 -- 11. 商户类型
@@ -346,7 +355,34 @@ COMMENT ON COLUMN merchant.update_time IS '更新时间';
 COMMENT ON COLUMN merchant.is_deleted IS '是否删除';
 
 -- ========================
--- 12. 门禁点表
+-- 12. 商品表
+-- ========================
+DROP TABLE IF EXISTS product;
+CREATE TABLE product (
+    id BIGSERIAL PRIMARY KEY,
+    product_name VARCHAR(100) NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    price NUMERIC(10,2) NOT NULL,
+    stock INT DEFAULT 0,
+    description VARCHAR(500),
+    image VARCHAR(255),
+    status SMALLINT DEFAULT 1,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP,
+    is_deleted SMALLINT DEFAULT 0
+);
+
+COMMENT ON TABLE product IS '商品表';
+COMMENT ON COLUMN product.product_name IS '商品名称';
+COMMENT ON COLUMN product.merchant_id IS '所属商户ID';
+COMMENT ON COLUMN product.price IS '商品单价';
+COMMENT ON COLUMN product.stock IS '库存';
+COMMENT ON COLUMN product.description IS '商品描述';
+COMMENT ON COLUMN product.image IS '商品图片';
+COMMENT ON COLUMN product.status IS '状态(1上架0下架)';
+
+-- ========================
+-- 13. 门禁点表
 -- ========================
 DROP TABLE IF EXISTS access_point;
 CREATE TABLE access_point (
@@ -841,6 +877,7 @@ CREATE INDEX idx_recharge_order_status ON recharge_order(status);
 -- 消费记录索引
 CREATE INDEX idx_consume_account_id ON consume_record(account_id);
 CREATE INDEX idx_consume_merchant_id ON consume_record(merchant_id);
+CREATE INDEX idx_consume_product_id ON consume_record(product_id);
 CREATE INDEX idx_consume_time ON consume_record(consume_time);
 CREATE INDEX idx_consume_status ON consume_record(status);
 
@@ -853,7 +890,6 @@ CREATE INDEX idx_account_flow_time ON account_flow(create_time);
 CREATE INDEX idx_student_no ON student(student_no);
 CREATE INDEX idx_student_teacher_id ON student(teacher_id);
 CREATE INDEX idx_student_attendance_mode ON student(attendance_mode);
-CREATE INDEX idx_student_attendance_status ON student(attendance_status);
 CREATE INDEX idx_teacher_no ON teacher(teacher_no);
 CREATE INDEX idx_college_major_college ON college_major(college_name);
 CREATE INDEX idx_college_major_status ON college_major(status);
@@ -861,6 +897,9 @@ CREATE INDEX idx_college_major_status ON college_major(status);
 -- 商户相关索引
 CREATE INDEX idx_merchant_type_id ON merchant(type_id);
 CREATE INDEX idx_merchant_status ON merchant(status);
+CREATE INDEX idx_product_merchant_id ON product(merchant_id);
+CREATE INDEX idx_product_name ON product(product_name);
+CREATE INDEX idx_product_status ON product(status);
 
 -- 辅助模块索引
 CREATE INDEX idx_access_card_id ON access_record(card_id);
@@ -871,21 +910,13 @@ CREATE INDEX idx_access_point_status ON access_point(status);
 CREATE INDEX idx_access_point_device_id ON access_point(device_id);
 CREATE INDEX idx_borrow_card_id ON borrow_record(card_id);
 CREATE INDEX idx_borrow_book_id ON borrow_record(book_id);
-CREATE INDEX idx_borrow_status ON borrow_record(status);
-CREATE INDEX idx_borrow_due_time ON borrow_record(due_time);
-CREATE INDEX idx_borrow_application_card_id ON borrow_application(card_id);
-CREATE INDEX idx_borrow_application_book_id ON borrow_application(book_id);
-CREATE INDEX idx_borrow_application_status ON borrow_application(status);
-CREATE INDEX idx_borrow_application_time ON borrow_application(application_time);
+CREATE INDEX idx_attendance_location_teacher_id ON attendance_location(teacher_id);
+CREATE INDEX idx_attendance_location_status ON attendance_location(status);
+CREATE INDEX idx_attendance_location_time ON attendance_location(start_time);
 CREATE INDEX idx_attendance_card_id ON attendance_record(card_id);
 CREATE INDEX idx_attendance_time ON attendance_record(record_time);
 CREATE INDEX idx_attendance_type ON attendance_record(attendance_type);
 CREATE INDEX idx_attendance_internship_log_date ON attendance_record(internship_log_date);
-CREATE INDEX idx_attendance_leave_application_id ON attendance_record(leave_application_id);
-CREATE INDEX idx_attendance_application_card_id ON attendance_application(card_id);
-CREATE INDEX idx_attendance_application_type ON attendance_application(application_type);
-CREATE INDEX idx_attendance_application_status ON attendance_application(status);
-CREATE INDEX idx_attendance_application_date ON attendance_application(start_date, end_date);
 -- 通勤车相关索引
 CREATE INDEX idx_commute_route_status ON commute_route(status);
 CREATE INDEX idx_commute_vehicle_plate ON commute_vehicle(plate_number);

@@ -109,3 +109,8 @@ export const getSchedulesByRouteId = (routeId) => {
 export const addCommuteRecord = (data) => {
   return request.post('/commute/record', data)
 }
+
+// 上车登记
+export const boardCommute = (data) => {
+  return request.post('/commute/boarding', data)
+}

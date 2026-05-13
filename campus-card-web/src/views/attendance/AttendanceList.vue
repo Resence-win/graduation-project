@@ -8,6 +8,24 @@
       </template>
 
       <el-form :inline="true" :model="statForm">
+        <el-form-item label="考勤点">
+          <el-select
+            v-model="statForm.locationId"
+            placeholder="请选择考勤点"
+            clearable
+            filterable
+            :loading="locationLoading"
+            style="width: 260px"
+            @change="handleLocationChange"
+          >
+            <el-option
+              v-for="item in locationOptions"
+              :key="item.id"
+              :label="getLocationOptionLabel(item)"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="开始日期">
           <el-date-picker v-model="statForm.startDate" type="date" placeholder="选择开始日期" disabled />
         </el-form-item>
@@ -19,12 +37,23 @@
           <el-button @click="handleStatReset">重置</el-button>
         </el-form-item>
       </el-form>
+      <el-alert
+        title="仅支持统计未过期或过期 1 个月内的考勤点，超过范围的考勤点不会出现在下拉列表中。"
+        type="info"
+        show-icon
+        :closable="false"
+        class="stat-range-tip"
+      />
 
       <div v-loading="statLoading" class="stat-content">
         <div class="stat-grid">
           <div class="stat-card">
-            <div class="stat-label">总打卡次数</div>
-            <div class="stat-value">{{ statData.total }}</div>
+            <div class="stat-label">应打卡数</div>
+            <div class="stat-value">{{ statData.expected }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">实际打卡数</div>
+            <div class="stat-value">{{ statData.actual }}</div>
           </div>
           <div class="stat-card clickable-stat-card" @click="applyStatusRangeFilter('正常')">
             <div class="stat-label">正常</div>
@@ -135,14 +164,18 @@
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { getAttendanceList, getAttendanceSummary } from '@/api/attendance'
+import { getAllLocations, getAttendanceList, getAttendanceSummary, getLocationsByTeacherId } from '@/api/attendance'
 import { getWeeklyAttendanceStat } from '@/api/statistics'
 
 const tableData = ref([])
 const listLoading = ref(false)
 const statLoading = ref(false)
+const locationLoading = ref(false)
 const weeklyChartRef = ref(null)
 const recordCardRef = ref(null)
+const locationOptions = ref([])
+const currentUser = ref({})
+const currentTeacherId = ref(null)
 let weeklyChart = null
 
 const getRecentSevenDayRange = () => {
@@ -163,6 +196,7 @@ const searchForm = reactive({
 })
 
 const statForm = reactive({
+  locationId: null,
   startDate: recentSevenDayRange.startDate,
   endDate: recentSevenDayRange.endDate
 })
@@ -175,6 +209,8 @@ const pagination = reactive({
 
 const statData = reactive({
   total: 0,
+  expected: 0,
+  actual: 0,
   normal: 0,
   late: 0,
   early: 0,
@@ -189,7 +225,7 @@ const weeklyData = reactive({
 
 const formatDate = (date) => {
   if (!date) return ''
-  if (typeof date === 'string') return date
+  if (typeof date === 'string') return date.slice(0, 10)
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
@@ -205,8 +241,83 @@ const setRecentSevenDayRange = () => {
 const parseDate = (value) => {
   if (!value) return null
   if (value instanceof Date) return value
-  const [year, month, day] = String(value).split('-').map(Number)
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
   return new Date(year, month - 1, day)
+}
+
+const parseDateTime = (value) => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  const date = new Date(String(value).replace(' ', 'T'))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const getStatisticRangeStart = () => {
+  const date = new Date()
+  date.setMonth(date.getMonth() - 1)
+  return date
+}
+
+const isLocationInStatisticRange = (location) => {
+  const endTime = parseDateTime(location?.endTime)
+  return endTime ? endTime.getTime() >= getStatisticRangeStart().getTime() : false
+}
+
+const loadCurrentUser = () => {
+  const userStr = localStorage.getItem('user')
+  if (!userStr) return
+  try {
+    const user = JSON.parse(userStr)
+    currentUser.value = user
+    currentTeacherId.value = user.role === 'teacher' ? user.businessUserId : null
+  } catch (error) {
+    currentUser.value = {}
+    currentTeacherId.value = null
+  }
+}
+
+const getSelectedLocation = () => {
+  return locationOptions.value.find(item => item.id === statForm.locationId)
+}
+
+const getLocationOptionLabel = (item) => {
+  const date = formatDate(item.startTime)
+  return date ? `${item.locationName}（${date}）` : item.locationName
+}
+
+const setStatRangeBySelectedLocation = () => {
+  const location = getSelectedLocation()
+  if (location) {
+    statForm.startDate = parseDate(location.startTime)
+    statForm.endDate = parseDate(location.endTime)
+  } else {
+    setRecentSevenDayRange()
+  }
+}
+
+const loadLocationOptions = async () => {
+  try {
+    locationLoading.value = true
+    const params = { page: 1, size: 1000 }
+    let res
+    if (currentUser.value.role === 'teacher' && currentTeacherId.value) {
+      res = await getLocationsByTeacherId(currentTeacherId.value, params)
+    } else {
+      res = await getAllLocations(params)
+    }
+    if (res.code === 0) {
+      const locations = res.data?.records || []
+      locationOptions.value = locations.filter(isLocationInStatisticRange)
+      if (statForm.locationId && !locationOptions.value.some(item => item.id === statForm.locationId)) {
+        statForm.locationId = null
+        setRecentSevenDayRange()
+      }
+    }
+  } catch (error) {
+    console.error('加载考勤点失败:', error)
+  } finally {
+    locationLoading.value = false
+  }
 }
 
 const validateDateRange = (startDate, endDate) => {
@@ -246,6 +357,7 @@ const loadData = async () => {
       page: pagination.page,
       size: pagination.size,
       card_id: searchForm.cardId,
+      location_id: statForm.locationId,
       status: searchForm.status,
       start_date: formatDate(searchForm.startDate),
       end_date: formatDate(searchForm.endDate)
@@ -272,6 +384,13 @@ const handleReset = () => {
   searchForm.status = null
   searchForm.startDate = null
   searchForm.endDate = null
+  loadData()
+}
+
+const handleLocationChange = () => {
+  setStatRangeBySelectedLocation()
+  pagination.page = 1
+  handleStatistics()
   loadData()
 }
 
@@ -349,7 +468,8 @@ const initWeeklyChart = () => {
 const loadWeeklyStatistics = async () => {
   const params = {
     start_date: formatDate(statForm.startDate),
-    end_date: formatDate(statForm.endDate)
+    end_date: formatDate(statForm.endDate),
+    location_id: statForm.locationId
   }
   const res = await getWeeklyAttendanceStat(params)
   if (res.code === 0) {
@@ -362,18 +482,23 @@ const loadWeeklyStatistics = async () => {
 }
 
 const handleStatistics = async () => {
-  setRecentSevenDayRange()
+  if (!statForm.startDate || !statForm.endDate) {
+    setStatRangeBySelectedLocation()
+  }
   if (!validateDateRange(statForm.startDate, statForm.endDate)) return
 
   try {
     statLoading.value = true
     const params = {
       start_date: formatDate(statForm.startDate),
-      end_date: formatDate(statForm.endDate)
+      end_date: formatDate(statForm.endDate),
+      location_id: statForm.locationId
     }
     const res = await getAttendanceSummary(params)
     if (res.code === 0) {
       statData.total = res.data?.total || 0
+      statData.expected = res.data?.expected ?? statData.total
+      statData.actual = res.data?.actual ?? statData.total
       statData.normal = res.data?.normal || 0
       statData.late = res.data?.late || 0
       statData.early = res.data?.early || 0
@@ -388,11 +513,15 @@ const handleStatistics = async () => {
 }
 
 const handleStatReset = () => {
+  statForm.locationId = null
   setRecentSevenDayRange()
   handleStatistics()
+  loadData()
 }
 
-onMounted(() => {
+onMounted(async () => {
+  loadCurrentUser()
+  await loadLocationOptions()
   loadData()
   handleStatistics()
   window.addEventListener('resize', handleChartResize)
@@ -427,6 +556,10 @@ onBeforeUnmount(() => {
 
 .stat-content {
   margin-top: 20px;
+}
+
+.stat-range-tip {
+  margin-top: 4px;
 }
 
 .stat-grid {

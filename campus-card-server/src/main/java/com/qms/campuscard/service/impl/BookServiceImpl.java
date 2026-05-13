@@ -6,15 +6,15 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qms.campuscard.entity.Book;
 import com.qms.campuscard.mapper.BookMapper;
 import com.qms.campuscard.service.BookService;
+import com.qms.campuscard.util.UploadPathResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.Resource;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -24,8 +24,11 @@ public class BookServiceImpl implements BookService {
     @Resource
     private BookMapper bookMapper;
 
-    @Value("${file.upload.path:./upload}")
-    private String uploadPath;
+    @Resource
+    private UploadPathResolver uploadPathResolver;
+
+    @Value("${file.upload.url-prefix:/upload}")
+    private String urlPrefix;
 
     @Override
     public IPage<Book> getBookList(String bookName, String author, String collectionLocation, Integer status, Integer page, Integer size) {
@@ -76,26 +79,21 @@ public class BookServiceImpl implements BookService {
         }
         String filename = UUID.randomUUID().toString() + extension;
 
-        // 确保使用绝对路径
-        String projectRoot = System.getProperty("user.dir");
-        String bookUploadPath = projectRoot + "/upload/book";
-        File uploadDir = new File(bookUploadPath);
-        if (!uploadDir.exists()) {
-            boolean created = uploadDir.mkdirs();
-            if (!created) {
-                throw new RuntimeException("无法创建上传目录");
-            }
+        Path uploadDir = uploadPathResolver.resolvePath("book");
+        try {
+            Files.createDirectories(uploadDir);
+        } catch (IOException e) {
+            throw new RuntimeException("无法创建上传目录", e);
         }
 
         try {
-            String filePath = bookUploadPath + "/" + filename;
-            file.transferTo(new File(filePath));
+            file.transferTo(uploadDir.resolve(filename).toFile());
 
             // 更新 logo 字段
-            existingBook.setLogo("/upload/book/" + filename);
+            existingBook.setLogo(urlPrefix + "/book/" + filename);
             bookMapper.updateById(existingBook);
 
-            return "/upload/book/" + filename;
+            return urlPrefix + "/book/" + filename;
         } catch (IOException e) {
             throw new RuntimeException("文件上传失败: " + e.getMessage(), e);
         }

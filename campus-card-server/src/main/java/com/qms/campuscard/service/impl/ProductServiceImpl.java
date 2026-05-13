@@ -9,6 +9,7 @@ import com.qms.campuscard.entity.Product;
 import com.qms.campuscard.mapper.MerchantMapper;
 import com.qms.campuscard.mapper.ProductMapper;
 import com.qms.campuscard.service.ProductService;
+import com.qms.campuscard.util.UploadPathResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +18,8 @@ import jakarta.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -28,6 +31,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Resource
     private MerchantMapper merchantMapper;
+
+    @Resource
+    private UploadPathResolver uploadPathResolver;
 
     @Value("${file.upload.url-prefix:/upload}")
     private String urlPrefix;
@@ -100,13 +106,10 @@ public class ProductServiceImpl implements ProductService {
                 extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             }
             String newFilename = UUID.randomUUID() + extension;
-            String absoluteUploadPath = System.getProperty("user.dir") + File.separator + "upload" + File.separator + "product";
-            File uploadDir = new File(absoluteUploadPath);
-            if (!uploadDir.exists()) {
-                uploadDir.mkdirs();
-            }
+            Path uploadDir = uploadPathResolver.resolvePath("product");
+            Files.createDirectories(uploadDir);
 
-            File destFile = new File(uploadDir, newFilename);
+            File destFile = uploadDir.resolve(newFilename).toFile();
             file.transferTo(destFile);
 
             String url = urlPrefix + "/product/" + newFilename;

@@ -91,12 +91,13 @@ public class AttendanceController {
     @GetMapping("/list")
     public Result<IPage<AttendanceRecord>> getAttendanceRecords(
             @RequestParam(required = false) Long card_id,
+            @RequestParam(required = false) Long location_id,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String start_date,
             @RequestParam(required = false) String end_date,
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size) {
-        IPage<AttendanceRecord> attendanceRecords = attendanceRecordService.getAttendanceRecords(card_id, status, start_date, end_date, page, size);
+        IPage<AttendanceRecord> attendanceRecords = attendanceRecordService.getAttendanceRecords(card_id, location_id, status, start_date, end_date, page, size);
         return Result.success(attendanceRecords);
     }
 
@@ -139,8 +140,9 @@ public class AttendanceController {
     @GetMapping("/summary")
     public Result<Map<String, Long>> getAttendanceSummary(
             @RequestParam(required = false) String start_date,
-            @RequestParam(required = false) String end_date) {
-        Map<String, Long> summary = attendanceRecordService.getAttendanceSummary(start_date, end_date);
+            @RequestParam(required = false) String end_date,
+            @RequestParam(required = false) Long location_id) {
+        Map<String, Long> summary = attendanceRecordService.getAttendanceSummary(start_date, end_date, location_id);
         return Result.success(summary);
     }
 

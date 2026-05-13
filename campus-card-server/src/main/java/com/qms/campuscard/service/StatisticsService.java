@@ -21,7 +21,7 @@ public interface StatisticsService {
 
     Map<String, Object> getCardCancelDetails(String startDate, String endDate, Integer page, Integer size);
 
-    Map<String, Object> getWeeklyAttendanceStatistics(String startDate, String endDate);
+    Map<String, Object> getWeeklyAttendanceStatistics(String startDate, String endDate, Long locationId);
 
     Map<String, Object> getCommuteStatistics(String startDate, String endDate);
 }

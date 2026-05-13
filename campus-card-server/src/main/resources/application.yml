@@ -23,7 +23,7 @@ spring:
 
 file:
   upload:
-    path: ./upload
+    path: upload
     url-prefix: /upload
 
 alipay:

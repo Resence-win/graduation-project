@@ -3,6 +3,8 @@ package com.qms.campuscard.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.qms.campuscard.dto.CommuteBoardingRequest;
+import com.qms.campuscard.dto.CommuteBoardingResponse;
 import com.qms.campuscard.entity.CampusCard;
 import com.qms.campuscard.entity.CommuteRecord;
 import com.qms.campuscard.entity.CommuteRoute;
@@ -16,6 +18,7 @@ import com.qms.campuscard.service.CommuteScheduleService;
 import com.qms.campuscard.service.CommuteVehicleService;
 import com.qms.campuscard.service.StudentService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
 import java.time.LocalDate;
@@ -73,6 +76,42 @@ public class CommuteRecordServiceImpl implements CommuteRecordService {
         record.setStatus(1);
         record.setRideTime(LocalDateTime.now());
         return commuteRecordMapper.insert(record) > 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommuteBoardingResponse boardCommute(CommuteBoardingRequest request) {
+        CommuteRecord record = buildBoardingRecord(request);
+        validateBoardingRecord(record);
+        record.setSeatNumber(String.valueOf(assignSeat(record.getScheduleId(), record.getVehicleId())));
+        record.setIsDeleted(0);
+        record.setStatus(1);
+        record.setRideTime(LocalDateTime.now());
+        commuteRecordMapper.insert(record);
+        return buildBoardingResponse(record);
+    }
+
+    private CommuteRecord buildBoardingRecord(CommuteBoardingRequest request) {
+        if (request == null) {
+            throw new RuntimeException("上车登记信息不能为空");
+        }
+        CommuteRecord record = new CommuteRecord();
+        record.setCardId(request.getCardId());
+        record.setRouteId(request.getRouteId());
+        record.setVehicleId(request.getVehicleId());
+        record.setScheduleId(request.getScheduleId());
+        return record;
+    }
+
+    private CommuteBoardingResponse buildBoardingResponse(CommuteRecord record) {
+        CommuteBoardingResponse response = new CommuteBoardingResponse();
+        response.setRecordId(record.getId());
+        response.setRouteId(record.getRouteId());
+        response.setVehicleId(record.getVehicleId());
+        response.setScheduleId(record.getScheduleId());
+        response.setSeatNumber(record.getSeatNumber());
+        response.setRideTime(record.getRideTime());
+        return response;
     }
 
     private void validateCommuteRecord(CommuteRecord record) {
@@ -139,6 +178,77 @@ public class CommuteRecordServiceImpl implements CommuteRecordService {
             throw new RuntimeException("该座位已被占用，请选择其他座位");
         }
         record.setSeatNumber(String.valueOf(seatNumber));
+    }
+
+    private void validateBoardingRecord(CommuteRecord record) {
+        validateBasicBoardingInfo(record);
+        validateRouteVehicleSchedule(record);
+        if (hasCheckedIn(record.getCardId(), record.getScheduleId())) {
+            throw new RuntimeException("该校园卡今天已登记该班次");
+        }
+    }
+
+    private void validateBasicBoardingInfo(CommuteRecord record) {
+        if (record.getCardId() == null) {
+            throw new RuntimeException("校园卡ID不能为空");
+        }
+        CampusCard card = getAvailableCard(record.getCardId());
+        if (card == null) {
+            throw new RuntimeException("校园卡不存在或不可用");
+        }
+        studentService.ensureStudentProfileCompleteByCard(card);
+    }
+
+    private void validateRouteVehicleSchedule(CommuteRecord record) {
+        if (record.getRouteId() == null) {
+            throw new RuntimeException("线路ID不能为空");
+        }
+        if (record.getVehicleId() == null) {
+            throw new RuntimeException("车辆ID不能为空");
+        }
+        if (record.getScheduleId() == null) {
+            throw new RuntimeException("班次ID不能为空");
+        }
+
+        CommuteRoute route = commuteRouteService.getRouteById(record.getRouteId());
+        if (route == null || !Integer.valueOf(1).equals(route.getStatus())) {
+            throw new RuntimeException("线路不存在或已停用");
+        }
+
+        CommuteVehicle vehicle = commuteVehicleService.getVehicleById(record.getVehicleId());
+        if (vehicle == null || !Integer.valueOf(1).equals(vehicle.getStatus())) {
+            throw new RuntimeException("车辆不存在或不可用");
+        }
+
+        CommuteSchedule schedule = commuteScheduleService.getScheduleById(record.getScheduleId());
+        if (schedule == null || !Integer.valueOf(1).equals(schedule.getStatus())) {
+            throw new RuntimeException("班次不存在或已停用");
+        }
+        if (!record.getRouteId().equals(schedule.getRouteId())) {
+            throw new RuntimeException("班次不属于所选线路");
+        }
+        if (!record.getVehicleId().equals(schedule.getVehicleId())) {
+            throw new RuntimeException("车辆不属于所选班次");
+        }
+
+        LocalDate today = LocalDate.now();
+        if ((schedule.getStartDate() != null && today.isBefore(schedule.getStartDate()))
+                || (schedule.getEndDate() != null && today.isAfter(schedule.getEndDate()))) {
+            throw new RuntimeException("班次不在有效日期内");
+        }
+    }
+
+    private Integer assignSeat(Long scheduleId, Long vehicleId) {
+        CommuteVehicle vehicle = commuteVehicleService.getVehicleById(vehicleId);
+        if (vehicle == null || vehicle.getSeatCount() == null || vehicle.getSeatCount() < 1) {
+            throw new RuntimeException("车辆座位数未配置");
+        }
+        for (int seatNumber = 1; seatNumber <= vehicle.getSeatCount(); seatNumber++) {
+            if (!isSeatOccupied(scheduleId, seatNumber)) {
+                return seatNumber;
+            }
+        }
+        throw new RuntimeException("该班次已满员");
     }
 
     private CampusCard getAvailableCard(Long cardId) {

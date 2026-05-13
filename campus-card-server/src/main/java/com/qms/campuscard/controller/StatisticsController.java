@@ -131,8 +131,9 @@ public class StatisticsController {
     @GetMapping("/api/stat/weekly-attendance")
     public Result<Map<String, Object>> getWeeklyAttendanceStatistics(
             @RequestParam(required = false, defaultValue = "") String start_date,
-            @RequestParam(required = false, defaultValue = "") String end_date) {
-        Map<String, Object> data = statisticsService.getWeeklyAttendanceStatistics(start_date, end_date);
+            @RequestParam(required = false, defaultValue = "") String end_date,
+            @RequestParam(required = false) Long location_id) {
+        Map<String, Object> data = statisticsService.getWeeklyAttendanceStatistics(start_date, end_date, location_id);
         logUtil.recordLog(1L, "查询", "statistics", null, "查询一周考勤统计");
         return Result.success(data);
     }

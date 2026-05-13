@@ -12,6 +12,7 @@ import com.qms.campuscard.mapper.CampusCardMapper;
 import com.qms.campuscard.mapper.StudentMapper;
 import com.qms.campuscard.service.AttendanceApplicationService;
 import com.qms.campuscard.service.StudentService;
+import com.qms.campuscard.util.UploadPathResolver;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.safety.Safelist;
@@ -22,6 +23,8 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,6 +73,9 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
 
     @Resource
     private StudentService studentService;
+
+    @Resource
+    private UploadPathResolver uploadPathResolver;
 
     @Value("${file.upload.url-prefix:/upload}")
     private String urlPrefix;
@@ -151,13 +157,10 @@ public class AttendanceApplicationServiceImpl implements AttendanceApplicationSe
         try {
             String newFilename = UUID.randomUUID() + "." + extension;
             String relativeDir = "attendance-application";
-            String absoluteUploadPath = System.getProperty("user.dir") + File.separator + "upload" + File.separator + relativeDir;
-            File uploadDir = new File(absoluteUploadPath);
-            if (!uploadDir.exists() && !uploadDir.mkdirs()) {
-                throw new RuntimeException("上传目录创建失败");
-            }
+            Path uploadDir = uploadPathResolver.resolvePath(relativeDir);
+            Files.createDirectories(uploadDir);
 
-            File destFile = new File(uploadDir, newFilename);
+            File destFile = uploadDir.resolve(newFilename).toFile();
             file.transferTo(destFile);
             String normalizedUrlPrefix = urlPrefix == null ? "/upload" : urlPrefix.trim();
             String url = normalizedUrlPrefix + "/" + relativeDir + "/" + newFilename;

@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="480" viewBox="0 0 720 480">
-  <rect width="720" height="480" fill="#fff3f2"/>
-  <rect x="160" y="184" width="400" height="112" rx="56" fill="#f2c5ad" transform="rotate(-18 360 240)"/>
-  <rect x="303" y="190" width="114" height="100" rx="22" fill="#ffe8dc" transform="rotate(-18 360 240)"/>
-  <circle cx="336" cy="231" r="8" fill="#d89b82"/>
-  <circle cx="374" cy="219" r="8" fill="#d89b82"/>
-  <circle cx="347" cy="266" r="8" fill="#d89b82"/>
-  <circle cx="385" cy="254" r="8" fill="#d89b82"/>
-</svg>

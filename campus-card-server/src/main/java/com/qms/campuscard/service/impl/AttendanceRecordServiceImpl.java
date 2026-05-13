@@ -29,6 +29,7 @@ import java.util.Map;
 public class AttendanceRecordServiceImpl implements AttendanceRecordService {
 
     private static final long NORMAL_CHECKIN_GRACE_MINUTES = 15;
+    private static final String STATISTIC_LOCATION_EXPIRED_MESSAGE = "该考勤点已过期超过1个月，暂不支持统计查看";
 
     @Resource
     private AttendanceRecordMapper attendanceRecordMapper;
@@ -52,7 +53,7 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
     private StudentService studentService;
 
     @Override
-    public IPage<AttendanceRecord> getAttendanceRecords(Long cardId, String status, String startDate, String endDate, Integer page, Integer size) {
+    public IPage<AttendanceRecord> getAttendanceRecords(Long cardId, Long locationId, String status, String startDate, String endDate, Integer page, Integer size) {
         if (page == null || page < 1) {
             page = 1;
         }
@@ -60,11 +61,17 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
             size = 10;
         }
 
+        AttendanceLocation statisticLocation = getStatisticLocationWithinRange(locationId);
+        generateMissingAttendanceRecordsIfEnded(statisticLocation);
+
         Page<AttendanceRecord> pageParam = new Page<>(page, size);
         QueryWrapper<AttendanceRecord> queryWrapper = new QueryWrapper<>();
 
         if (cardId != null) {
             queryWrapper.eq("card_id", cardId);
+        }
+        if (locationId != null) {
+            queryWrapper.eq("location_id", locationId);
         }
         if (status != null && !status.trim().isEmpty()) {
             queryWrapper.eq("status", status);
@@ -262,6 +269,9 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
             size = 10;
         }
 
+        AttendanceLocation statisticLocation = getStatisticLocationWithinRange(locationId);
+        generateMissingAttendanceRecordsIfEnded(statisticLocation);
+
         Page<AttendanceRecord> pageParam = new Page<>(page, size);
         QueryWrapper<AttendanceRecord> queryWrapper = new QueryWrapper<>();
 
@@ -323,7 +333,10 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
     }
 
     @Override
-    public Map<String, Long> getAttendanceSummary(String startDate, String endDate) {
+    public Map<String, Long> getAttendanceSummary(String startDate, String endDate, Long locationId) {
+        AttendanceLocation statisticLocation = getStatisticLocationWithinRange(locationId);
+        generateMissingAttendanceRecordsIfEnded(statisticLocation);
+
         QueryWrapper<AttendanceRecord> queryWrapper = new QueryWrapper<>();
 
         if (startDate != null && !startDate.trim().isEmpty()) {
@@ -331,23 +344,34 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         }
         if (endDate != null && !endDate.trim().isEmpty()) {
             queryWrapper.le("record_time", endDate + "T23:59:59");
+        }
+        if (locationId != null) {
+            queryWrapper.eq("location_id", locationId);
         }
 
         queryWrapper.eq("is_deleted", 0);
 
         long total = attendanceRecordMapper.selectCount(queryWrapper);
+        long normal = countByStatus(startDate, endDate, locationId, "正常");
+        long late = countByStatus(startDate, endDate, locationId, "迟到");
+        long early = countByStatus(startDate, endDate, locationId, "早退");
+        long absent = countByStatus(startDate, endDate, locationId, "缺勤");
+        long actual = normal + late + early;
+        long expected = statisticLocation == null ? total : countExpectedAttendance(statisticLocation);
 
         Map<String, Long> summary = new HashMap<>();
         summary.put("total", total);
-        summary.put("normal", countByStatus(startDate, endDate, "正常"));
-        summary.put("late", countByStatus(startDate, endDate, "迟到"));
-        summary.put("early", countByStatus(startDate, endDate, "早退"));
-        summary.put("absent", countByStatus(startDate, endDate, "缺勤"));
+        summary.put("expected", expected);
+        summary.put("actual", actual);
+        summary.put("normal", normal);
+        summary.put("late", late);
+        summary.put("early", early);
+        summary.put("absent", absent);
 
         return summary;
     }
 
-    private Long countByStatus(String startDate, String endDate, String status) {
+    private Long countByStatus(String startDate, String endDate, Long locationId, String status) {
         QueryWrapper<AttendanceRecord> queryWrapper = new QueryWrapper<>();
 
         if (startDate != null && !startDate.trim().isEmpty()) {
@@ -355,12 +379,59 @@ public class AttendanceRecordServiceImpl implements AttendanceRecordService {
         }
         if (endDate != null && !endDate.trim().isEmpty()) {
             queryWrapper.le("record_time", endDate + "T23:59:59");
+        }
+        if (locationId != null) {
+            queryWrapper.eq("location_id", locationId);
         }
 
         queryWrapper.eq("status", status);
         queryWrapper.eq("is_deleted", 0);
 
         return attendanceRecordMapper.selectCount(queryWrapper);
+    }
+
+    private AttendanceLocation getStatisticLocationWithinRange(Long locationId) {
+        if (locationId == null) {
+            return null;
+        }
+        AttendanceLocation location = attendanceLocationService.getLocationById(locationId);
+        if (location == null) {
+            throw new RuntimeException("打卡位置不存在");
+        }
+        if (location.getEndTime() == null) {
+            throw new RuntimeException("打卡位置未配置结束时间，暂不支持统计查看");
+        }
+        if (location.getEndTime().isBefore(LocalDateTime.now().minusMonths(1))) {
+            throw new RuntimeException(STATISTIC_LOCATION_EXPIRED_MESSAGE);
+        }
+        return location;
+    }
+
+    private void generateMissingAttendanceRecordsIfEnded(AttendanceLocation location) {
+        if (location != null && location.getEndTime() != null && !location.getEndTime().isAfter(LocalDateTime.now())) {
+            generateMissingAttendanceRecords(location);
+        }
+    }
+
+    private long countExpectedAttendance(AttendanceLocation location) {
+        if (location == null || location.getTeacherId() == null || location.getEndTime() == null) {
+            return 0L;
+        }
+        LocalDate attendanceDate = location.getEndTime().toLocalDate();
+        QueryWrapper<Student> studentQuery = new QueryWrapper<>();
+        studentQuery.eq("teacher_id", location.getTeacherId());
+        studentQuery.eq("is_deleted", 0);
+        List<Student> students = studentMapper.selectList(studentQuery);
+        long count = 0L;
+        for (Student student : students) {
+            if (!shouldGenerateAbsentRecord(student, attendanceDate)) {
+                continue;
+            }
+            if (getActiveStudentCard(student.getId()) != null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private void fillRecordExtraInfo(IPage<AttendanceRecord> result) {

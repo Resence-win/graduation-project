@@ -33,7 +33,7 @@
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleEditLocation(row)">编辑</el-button>
             <el-button type="danger" size="small" @click="handleDeleteLocation(row.id)">删除</el-button>
-            <el-button size="small" @click="handleViewRecords(row.id)">查看记录</el-button>
+            <el-button size="small" @click="handleViewRecords(row)">查看记录</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -156,12 +156,50 @@
     <!-- 打卡记录对话框 -->
     <el-dialog
       v-model="recordDialogVisible"
-      title="打卡记录"
-      width="800px"
+      :title="recordDialogTitle"
+      width="1200px"
+      class="record-stat-dialog"
+      @closed="handleRecordDialogClosed"
     >
-      <el-table :data="recordList" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="cardId" label="卡ID" width="100" />
+      <div v-loading="recordStatLoading" class="record-stat-content">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">应打卡数</div>
+            <div class="stat-value">{{ recordStatData.expected }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">实际打卡数</div>
+            <div class="stat-value">{{ recordStatData.actual }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">正常</div>
+            <div class="stat-value success">{{ recordStatData.normal }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">迟到</div>
+            <div class="stat-value warning">{{ recordStatData.late }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">早退</div>
+            <div class="stat-value warning">{{ recordStatData.early }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">缺勤</div>
+            <div class="stat-value danger">{{ recordStatData.absent }}</div>
+          </div>
+        </div>
+        <div ref="recordChartRef" class="record-chart"></div>
+      </div>
+
+      <el-table
+        v-loading="recordLoading"
+        :data="recordList"
+        border
+        table-layout="fixed"
+        class="record-table"
+      >
+        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column prop="cardNo" label="卡号" width="140" show-overflow-tooltip />
         <el-table-column prop="status" label="考勤状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
@@ -169,16 +207,16 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="考勤类型" width="120">
+        <el-table-column label="考勤类型" width="110" show-overflow-tooltip>
           <template #default="{ row }">
             {{ getAttendanceTypeLabel(row.attendanceType) }}
           </template>
         </el-table-column>
-        <el-table-column prop="actualLocation" label="实际打卡地点" />
-        <el-table-column prop="actualLatitude" label="实际纬度" width="120" />
-        <el-table-column prop="actualLongitude" label="实际经度" width="120" />
-        <el-table-column prop="deviceInfo" label="设备信息" />
-        <el-table-column prop="recordTime" label="记录时间" width="180" />
+        <el-table-column prop="actualLocation" label="实际打卡地点" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="actualLatitude" label="实际纬度" width="110" show-overflow-tooltip />
+        <el-table-column prop="actualLongitude" label="实际经度" width="110" show-overflow-tooltip />
+        <el-table-column prop="deviceInfo" label="设备信息" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="recordTime" label="记录时间" width="170" show-overflow-tooltip />
       </el-table>
       
       <el-pagination
@@ -201,17 +239,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
+import * as echarts from 'echarts'
 import { 
   createLocation, 
   updateLocation, 
   deleteLocation, 
   getAllLocations,
-  getLocationsByTeacherId, 
-  getAttendanceRecordsByLocationId 
+  getLocationsByTeacherId,
+  getAttendanceRecordsByLocationId,
+  getAttendanceSummary
 } from '@/api/attendance'
+import { getWeeklyAttendanceStat } from '@/api/statistics'
 
 const locationList = ref([])
 const recordList = ref([])
@@ -219,10 +260,15 @@ const dialogVisible = ref(false)
 const recordDialogVisible = ref(false)
 const dialogTitle = ref('添加打卡位置')
 const currentLocationId = ref(null)
+const currentRecordLocation = ref(null)
 const currentUser = ref({})
 const currentTeacherId = ref(null)
 const originalStartTime = ref(null)
 const originalEndTime = ref(null)
+const recordLoading = ref(false)
+const recordStatLoading = ref(false)
+const recordChartRef = ref(null)
+let recordChart = null
 
 const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 
@@ -262,6 +308,22 @@ const recordPagination = reactive({
   total: 0
 })
 
+const recordStatData = reactive({
+  total: 0,
+  expected: 0,
+  actual: 0,
+  normal: 0,
+  late: 0,
+  early: 0,
+  absent: 0
+})
+
+const recordWeeklyData = reactive({
+  startDate: '',
+  endDate: '',
+  daily: []
+})
+
 const locationForm = reactive({
   locationName: '',
   location: '',
@@ -280,6 +342,11 @@ const timeForm = reactive({
   endClock: ''
 })
 
+const recordDialogTitle = computed(() => {
+  const name = currentRecordLocation.value?.locationName
+  return name ? `${name} - 打卡记录` : '打卡记录'
+})
+
 const parseDateTime = (value) => {
   if (!value) return null
   if (value instanceof Date) return value
@@ -291,6 +358,17 @@ const parseDateTime = (value) => {
 const getTimestamp = (value) => {
   const date = parseDateTime(value)
   return date ? date.getTime() : null
+}
+
+const getStatisticRangeStart = () => {
+  const date = new Date()
+  date.setMonth(date.getMonth() - 1)
+  return date
+}
+
+const isLocationInStatisticRange = (location) => {
+  const endTime = parseDateTime(location?.endTime)
+  return endTime ? endTime.getTime() >= getStatisticRangeStart().getTime() : false
 }
 
 const formatDateTime = (value) => {
@@ -488,6 +566,7 @@ const loadLocations = async () => {
 
 const loadRecords = async (locationId) => {
   try {
+    recordLoading.value = true
     const res = await getAttendanceRecordsByLocationId(locationId, {
       page: recordPagination.page,
       size: recordPagination.size
@@ -499,7 +578,84 @@ const loadRecords = async (locationId) => {
   } catch (error) {
     console.error('加载打卡记录失败:', error)
     ElMessage.error('加载失败')
+  } finally {
+    recordLoading.value = false
   }
+}
+
+const initRecordChart = () => {
+  if (!recordChartRef.value) return
+  if (recordChart) {
+    recordChart.dispose()
+  }
+  recordChart = echarts.init(recordChartRef.value)
+  const rows = recordWeeklyData.daily || []
+  recordChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { top: 0 },
+    grid: { top: 45, left: 45, right: 20, bottom: 40 },
+    xAxis: { type: 'category', data: rows.map(item => item.date) },
+    yAxis: {
+      type: 'value',
+      name: '人数',
+      minInterval: 1,
+      axisLabel: { formatter: value => String(Math.round(value)) }
+    },
+    series: [
+      { name: '正常', type: 'bar', data: rows.map(item => Number(item.normal || 0)), itemStyle: { color: '#67C23A' } },
+      { name: '迟到', type: 'bar', data: rows.map(item => Number(item.late || 0)), itemStyle: { color: '#E6A23C' } },
+      { name: '早退', type: 'bar', data: rows.map(item => Number(item.early || 0)), itemStyle: { color: '#909399' } },
+      { name: '缺勤', type: 'bar', data: rows.map(item => Number(item.absent || 0)), itemStyle: { color: '#F56C6C' } }
+    ]
+  })
+}
+
+const loadRecordStatistics = async (locationId) => {
+  if (!locationId || !currentRecordLocation.value) return
+  try {
+    recordStatLoading.value = true
+    const params = {
+      location_id: locationId,
+      start_date: formatDate(currentRecordLocation.value.startTime),
+      end_date: formatDate(currentRecordLocation.value.endTime)
+    }
+    const summaryRes = await getAttendanceSummary(params)
+    if (summaryRes.code === 0) {
+      recordStatData.total = summaryRes.data?.total || 0
+      recordStatData.expected = summaryRes.data?.expected ?? recordStatData.total
+      recordStatData.actual = summaryRes.data?.actual ?? recordStatData.total
+      recordStatData.normal = summaryRes.data?.normal || 0
+      recordStatData.late = summaryRes.data?.late || 0
+      recordStatData.early = summaryRes.data?.early || 0
+      recordStatData.absent = summaryRes.data?.absent || 0
+    }
+    const weeklyRes = await getWeeklyAttendanceStat(params)
+    if (weeklyRes.code === 0) {
+      recordWeeklyData.startDate = weeklyRes.data?.startDate || ''
+      recordWeeklyData.endDate = weeklyRes.data?.endDate || ''
+      recordWeeklyData.daily = weeklyRes.data?.daily || []
+      await nextTick()
+      initRecordChart()
+    }
+  } catch (error) {
+    console.error('加载考勤统计失败:', error)
+    ElMessage.error('加载考勤统计失败')
+  } finally {
+    recordStatLoading.value = false
+  }
+}
+
+const resetRecordStatistics = () => {
+  recordStatData.total = 0
+  recordStatData.expected = 0
+  recordStatData.actual = 0
+  recordStatData.normal = 0
+  recordStatData.late = 0
+  recordStatData.early = 0
+  recordStatData.absent = 0
+  recordWeeklyData.startDate = ''
+  recordWeeklyData.endDate = ''
+  recordWeeklyData.daily = []
 }
 
 const handleAddLocation = () => {
@@ -640,11 +796,19 @@ const handleDeleteLocation = async (id) => {
   }
 }
 
-const handleViewRecords = (locationId) => {
-  currentLocationId.value = locationId
+const handleViewRecords = async (row) => {
+  if (!isLocationInStatisticRange(row)) {
+    ElMessage.warning('该考勤点已过期超过1个月，暂不支持统计查看')
+    return
+  }
+  currentLocationId.value = row.id
+  currentRecordLocation.value = row
   recordPagination.page = 1
-  loadRecords(locationId)
+  resetRecordStatistics()
   recordDialogVisible.value = true
+  await nextTick()
+  loadRecordStatistics(row.id)
+  loadRecords(row.id)
 }
 
 const handleSizeChange = (val) => {
@@ -659,6 +823,7 @@ const handleCurrentChange = (val) => {
 
 const handleRecordSizeChange = (val) => {
   recordPagination.size = val
+  recordPagination.page = 1
   loadRecords(currentLocationId.value)
 }
 
@@ -667,9 +832,30 @@ const handleRecordCurrentChange = (val) => {
   loadRecords(currentLocationId.value)
 }
 
+const handleRecordDialogClosed = () => {
+  if (recordChart) {
+    recordChart.dispose()
+    recordChart = null
+  }
+  currentRecordLocation.value = null
+  recordList.value = []
+}
+
+const handleRecordChartResize = () => {
+  recordChart?.resize()
+}
+
 onMounted(() => {
   loadCurrentUser()
   loadLocations()
+  window.addEventListener('resize', handleRecordChartResize)
+})
+
+onBeforeUnmount(() => {
+  if (recordChart) {
+    recordChart.dispose()
+  }
+  window.removeEventListener('resize', handleRecordChartResize)
 })
 </script>
 
@@ -727,6 +913,64 @@ onMounted(() => {
 .location-error {
   margin-left: 12px;
   color: #f56c6c;
+}
+
+.record-stat-content {
+  margin-bottom: 20px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+}
+
+.stat-card {
+  padding: 16px;
+  text-align: center;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 10px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.stat-value.success {
+  color: #67C23A;
+}
+
+.stat-value.warning {
+  color: #E6A23C;
+}
+
+.stat-value.danger {
+  color: #F56C6C;
+}
+
+.record-chart {
+  width: 100%;
+  height: 320px;
+  margin-top: 20px;
+}
+
+.record-table :deep(.el-table__cell) {
+  padding: 8px 0;
+}
+
+.record-table :deep(.cell) {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .dialog-footer {

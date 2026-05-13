@@ -10,6 +10,7 @@ import com.qms.campuscard.mapper.MerchantMapper;
 import com.qms.campuscard.mapper.MerchantTypeMapper;
 import com.qms.campuscard.service.MerchantService;
 import com.qms.campuscard.util.RedisUtil;
+import com.qms.campuscard.util.UploadPathResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -37,8 +40,8 @@ public class MerchantServiceImpl implements MerchantService {
     @Resource
     private RedisUtil redisUtil;
 
-    @Value("${file.upload.path:/tmp/upload}")
-    private String uploadPath;
+    @Resource
+    private UploadPathResolver uploadPathResolver;
 
     @Value("${file.upload.url-prefix:/upload}")
     private String urlPrefix;
@@ -176,15 +179,10 @@ public class MerchantServiceImpl implements MerchantService {
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             String newFilename = UUID.randomUUID().toString() + extension;
 
-            // 直接使用项目根目录下的upload目录
-            String absoluteUploadPath = System.getProperty("user.dir") + File.separator + "upload";
+            Path uploadDir = uploadPathResolver.resolveRootPath();
+            Files.createDirectories(uploadDir);
 
-            File uploadDir = new File(absoluteUploadPath);
-            if (!uploadDir.exists()) {
-                uploadDir.mkdirs();
-            }
-
-            File destFile = new File(uploadDir, newFilename);
+            File destFile = uploadDir.resolve(newFilename).toFile();
             file.transferTo(destFile);
 
             String url = urlPrefix + "/" + newFilename;

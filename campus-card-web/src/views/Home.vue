@@ -7,11 +7,11 @@
           <span>{{ todayText }}</span>
         </div>
         <h1>{{ greeting }}，{{ username }}</h1>
-        <p>校园一卡通管理系统运营驾驶舱</p>
+        <p>管理员工作台 · 今日工作概览</p>
         <div class="hero-actions">
           <el-button type="primary" @click="goTo('/statistics')">
-            <el-icon><TrendCharts /></el-icon>
-            数据统计
+            <el-icon><Histogram /></el-icon>
+            查看完整统计
           </el-button>
           <el-button plain @click="reloadDashboard">
             <el-icon><RefreshRight /></el-icon>
@@ -23,6 +23,10 @@
         <div class="summary-label">今日消费</div>
         <div class="summary-value">¥{{ formatAmount(todayConsume) }}</div>
         <div class="summary-sub">近 7 日消费 ¥{{ formatAmount(toNumber(overviewData.consumeAmount)) }}</div>
+        <div class="summary-progress">
+          <span>待关注事项</span>
+          <strong>{{ attentionCount }} 项</strong>
+        </div>
         <div class="summary-progress">
           <span>校园卡正常率</span>
           <strong>{{ activeCardRate }}%</strong>
@@ -46,50 +50,7 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="18" class="dashboard-row">
-      <el-col :xs="24" :lg="15">
-        <el-card class="panel-card" shadow="never">
-          <template #header>
-            <div class="panel-header">
-              <div>
-                <span>近 7 日消费趋势</span>
-                <small>消费金额按日期汇总</small>
-              </div>
-              <el-tag effect="plain" type="success">实时统计</el-tag>
-            </div>
-          </template>
-          <div ref="consumeChartRef" class="chart-box"></div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="9">
-        <el-card class="panel-card" shadow="never">
-          <template #header>
-            <div class="panel-header">
-              <div>
-                <span>校园卡状态</span>
-                <small>正常、挂失、注销分布</small>
-              </div>
-            </div>
-          </template>
-          <div ref="cardStatusChartRef" class="chart-box compact"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="18" class="dashboard-row">
-      <el-col :xs="24" :lg="14">
-        <el-card class="panel-card" shadow="never">
-          <template #header>
-            <div class="panel-header">
-              <div>
-                <span>业务量概览</span>
-                <small>近 7 日高频业务对比</small>
-              </div>
-            </div>
-          </template>
-          <div ref="businessChartRef" class="chart-box"></div>
-        </el-card>
-      </el-col>
+    <el-row :gutter="18" class="workbench-row">
       <el-col :xs="24" :lg="10">
         <el-card class="panel-card" shadow="never">
           <template #header>
@@ -116,6 +77,31 @@
           <el-empty v-else description="暂无需要重点关注的事项" :image-size="90" />
         </el-card>
       </el-col>
+      <el-col :xs="24" :lg="14">
+        <el-card class="panel-card" shadow="never">
+          <template #header>
+            <div class="panel-header">
+              <div>
+                <span>业务动态</span>
+                <small>近 7 日关键业务状态</small>
+              </div>
+              <el-button text type="primary" @click="goTo('/statistics')">查看完整统计</el-button>
+            </div>
+          </template>
+          <div class="activity-grid">
+            <div v-for="item in activityCards" :key="item.label" class="activity-card" :class="item.tone">
+              <span class="activity-icon">
+                <component :is="item.icon" />
+              </span>
+              <div class="activity-copy">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+                <em>{{ item.desc }}</em>
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
     </el-row>
 
     <el-card class="panel-card quick-panel" shadow="never">
@@ -132,7 +118,10 @@
           <span class="quick-icon" :class="item.tone">
             <component :is="item.icon" />
           </span>
-          <span>{{ item.label }}</span>
+          <span>
+            <strong>{{ item.label }}</strong>
+            <em>{{ item.desc }}</em>
+          </span>
           <el-icon><ArrowRight /></el-icon>
         </button>
       </div>
@@ -141,16 +130,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import * as echarts from 'echarts'
 import dayjs from 'dayjs'
 import {
   ArrowRight,
   Bell,
   Calendar,
   CreditCard,
-  Goods,
   Histogram,
   Lock,
   Management,
@@ -160,13 +147,12 @@ import {
   School,
   Shop,
   Tickets,
-  TrendCharts,
   User,
   Wallet,
   WarningFilled
 } from '@element-plus/icons-vue'
 import { getDashboardData } from '@/api/dashboard'
-import { getConsumeStat, getLibraryOverdueStat, getOverview } from '@/api/statistics'
+import { getLibraryOverdueStat, getOverview } from '@/api/statistics'
 
 const router = useRouter()
 
@@ -174,16 +160,7 @@ const loading = ref(false)
 const username = ref('管理员')
 const dashboardData = ref({})
 const overviewData = ref({})
-const consumeTrendData = ref([])
 const libraryData = ref({})
-
-const consumeChartRef = ref(null)
-const cardStatusChartRef = ref(null)
-const businessChartRef = ref(null)
-
-let consumeChart = null
-let cardStatusChart = null
-let businessChart = null
 
 const rangeParams = () => ({
   start_date: dayjs().subtract(6, 'day').format('YYYY-MM-DD'),
@@ -206,12 +183,7 @@ const greeting = computed(() => {
 
 const todayConsume = computed(() => {
   const dashboardValue = dashboardData.value.todayConsume
-  if (dashboardValue !== undefined && dashboardValue !== null) {
-    return toNumber(dashboardValue)
-  }
-  const today = dayjs().format('YYYY-MM-DD')
-  const todayRow = consumeTrendData.value.find(item => item.date === today)
-  return toNumber(todayRow?.total_amount)
+  return dashboardValue !== undefined && dashboardValue !== null ? toNumber(dashboardValue) : 0
 })
 
 const cardTotal = computed(() => toNumber(overviewData.value.cardTotal))
@@ -220,6 +192,11 @@ const activeCardRate = computed(() => {
   if (!cardTotal.value) return 0
   return Math.round((toNumber(overviewData.value.activeCardCount) / cardTotal.value) * 100)
 })
+
+const accessFailedCount = computed(() => Math.max(
+  toNumber(overviewData.value.accessCount) - toNumber(overviewData.value.accessSuccessCount),
+  0
+))
 
 const metricCards = computed(() => [
   {
@@ -244,13 +221,6 @@ const metricCards = computed(() => [
     tone: 'tone-orange'
   },
   {
-    label: '商品总数',
-    value: toNumber(overviewData.value.productCount),
-    desc: '可消费商品',
-    icon: Goods,
-    tone: 'tone-purple'
-  },
-  {
     label: '正常卡数',
     value: toNumber(overviewData.value.activeCardCount),
     desc: `总卡数 ${cardTotal.value}`,
@@ -258,35 +228,24 @@ const metricCards = computed(() => [
     tone: 'tone-cyan'
   },
   {
-    label: '消费金额',
-    value: formatAmount(overviewData.value.consumeAmount),
-    desc: '近 7 日累计',
+    label: '今日消费',
+    value: formatAmount(todayConsume.value),
+    desc: '今日消费金额',
     icon: Money,
     prefix: '¥',
     tone: 'tone-red'
   },
   {
-    label: '充值金额',
-    value: formatAmount(overviewData.value.rechargeAmount),
-    desc: '近 7 日累计',
-    icon: Wallet,
-    prefix: '¥',
-    tone: 'tone-teal'
-  },
-  {
-    label: '考勤记录',
-    value: toNumber(overviewData.value.attendanceCount),
-    desc: '近 7 日记录',
-    icon: Tickets,
-    tone: 'tone-indigo'
+    label: '待关注',
+    value: attentionCount.value,
+    desc: '需处理事项',
+    icon: WarningFilled,
+    suffix: '项',
+    tone: 'tone-purple'
   }
 ])
 
 const operationAlerts = computed(() => {
-  const accessFailedCount = Math.max(
-    toNumber(overviewData.value.accessCount) - toNumber(overviewData.value.accessSuccessCount),
-    0
-  )
   const items = [
     {
       label: '挂失校园卡',
@@ -318,7 +277,7 @@ const operationAlerts = computed(() => {
     },
     {
       label: '门禁异常',
-      value: accessFailedCount,
+      value: accessFailedCount.value,
       desc: '近 7 日未成功通行记录',
       icon: Lock,
       type: 'danger'
@@ -327,162 +286,66 @@ const operationAlerts = computed(() => {
   return items.filter(item => item.value > 0)
 })
 
+const attentionCount = computed(() => operationAlerts.value.length)
+
+const activityCards = computed(() => [
+  {
+    label: '近 7 日消费',
+    value: `¥${formatAmount(overviewData.value.consumeAmount)}`,
+    desc: `${toNumber(overviewData.value.consumeCount)} 笔消费记录`,
+    icon: Money,
+    tone: 'tone-red'
+  },
+  {
+    label: '近 7 日充值',
+    value: `¥${formatAmount(overviewData.value.rechargeAmount)}`,
+    desc: `${toNumber(overviewData.value.rechargeCount)} 笔充值记录`,
+    icon: Wallet,
+    tone: 'tone-teal'
+  },
+  {
+    label: '门禁通行',
+    value: `${toNumber(overviewData.value.accessSuccessCount)} 次`,
+    desc: `异常 ${accessFailedCount.value} 次`,
+    icon: Lock,
+    tone: 'tone-indigo'
+  },
+  {
+    label: '考勤记录',
+    value: `${toNumber(overviewData.value.attendanceCount)} 条`,
+    desc: `异常 ${toNumber(overviewData.value.abnormalAttendanceCount)} 条`,
+    icon: Tickets,
+    tone: 'tone-green'
+  },
+  {
+    label: '图书借阅',
+    value: `${toNumber(overviewData.value.borrowCount)} 次`,
+    desc: `当前逾期 ${toNumber(libraryData.value.currentOverdueCount || overviewData.value.overdueBorrowCount)} 本`,
+    icon: Reading,
+    tone: 'tone-orange'
+  },
+  {
+    label: '通勤乘车',
+    value: `${toNumber(overviewData.value.commuteRideCount)} 次`,
+    desc: '近 7 日乘车记录',
+    icon: Management,
+    tone: 'tone-blue'
+  }
+])
+
 const quickActions = [
-  { label: '学生管理', path: '/student', icon: User, tone: 'tone-blue' },
-  { label: '校园卡管理', path: '/card', icon: CreditCard, tone: 'tone-cyan' },
-  { label: '充值管理', path: '/recharge', icon: Wallet, tone: 'tone-teal' },
-  { label: '消费管理', path: '/consume', icon: Money, tone: 'tone-red' },
-  { label: '数据统计', path: '/statistics', icon: Histogram, tone: 'tone-purple' },
-  { label: '图书管理', path: '/book', icon: Reading, tone: 'tone-orange' },
-  { label: '门禁管理', path: '/access', icon: Lock, tone: 'tone-indigo' },
-  { label: '考勤管理', path: '/attendance', icon: Management, tone: 'tone-green' }
+  { label: '学生管理', desc: '维护学生档案', path: '/student', icon: User, tone: 'tone-blue' },
+  { label: '校园卡管理', desc: '开卡、挂失、注销', path: '/card', icon: CreditCard, tone: 'tone-cyan' },
+  { label: '充值管理', desc: '处理充值流水', path: '/recharge', icon: Wallet, tone: 'tone-teal' },
+  { label: '消费管理', desc: '查看消费记录', path: '/consume', icon: Money, tone: 'tone-red' },
+  { label: '数据统计', desc: '分析业务报表', path: '/statistics', icon: Histogram, tone: 'tone-purple' },
+  { label: '图书管理', desc: '维护馆藏与借阅', path: '/book', icon: Reading, tone: 'tone-orange' },
+  { label: '门禁管理', desc: '查看通行记录', path: '/access', icon: Lock, tone: 'tone-indigo' },
+  { label: '考勤管理', desc: '管理考勤记录', path: '/attendance', icon: Management, tone: 'tone-green' }
 ]
 
 const goTo = (path) => {
   router.push(path)
-}
-
-const normalizeConsumeTrend = (rows = []) => {
-  const rowMap = new Map(rows.map(item => [item.date, item]))
-  return Array.from({ length: 7 }).map((_, index) => {
-    const date = dayjs().subtract(6 - index, 'day').format('YYYY-MM-DD')
-    const row = rowMap.get(date) || {}
-    return {
-      date,
-      total_amount: toNumber(row.total_amount),
-      consume_count: toNumber(row.consume_count)
-    }
-  })
-}
-
-const resetChart = (chart, el) => {
-  if (chart) {
-    chart.dispose()
-  }
-  return el.value ? echarts.init(el.value) : null
-}
-
-const initConsumeChart = () => {
-  consumeChart = resetChart(consumeChart, consumeChartRef)
-  if (!consumeChart) return
-
-  const rows = normalizeConsumeTrend(consumeTrendData.value)
-  consumeChart.setOption({
-    color: ['#1677ff'],
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params) => {
-        const item = params[0]
-        return `${item.axisValue}<br/>消费金额：¥${formatAmount(item.value)}`
-      }
-    },
-    grid: { top: 26, left: 44, right: 22, bottom: 36 },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: rows.map(item => dayjs(item.date).format('MM/DD')),
-      axisTick: { show: false },
-      axisLine: { lineStyle: { color: '#dcdfe6' } }
-    },
-    yAxis: {
-      type: 'value',
-      name: '元',
-      axisLine: { show: false },
-      splitLine: { lineStyle: { color: '#eef1f6' } }
-    },
-    series: [{
-      name: '消费金额',
-      type: 'line',
-      smooth: true,
-      symbolSize: 8,
-      data: rows.map(item => item.total_amount),
-      areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(22, 119, 255, 0.22)' },
-          { offset: 1, color: 'rgba(22, 119, 255, 0.02)' }
-        ])
-      },
-      lineStyle: { width: 3 }
-    }]
-  })
-}
-
-const initCardStatusChart = () => {
-  cardStatusChart = resetChart(cardStatusChart, cardStatusChartRef)
-  if (!cardStatusChart) return
-
-  const rows = [
-    { name: '正常', value: toNumber(overviewData.value.activeCardCount), itemStyle: { color: '#22c55e' } },
-    { name: '挂失', value: toNumber(overviewData.value.lostCardCount), itemStyle: { color: '#f59e0b' } },
-    { name: '注销', value: toNumber(overviewData.value.cancelledCardCount), itemStyle: { color: '#ef4444' } }
-  ]
-
-  cardStatusChart.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}：{c} 张 ({d}%)' },
-    legend: { bottom: 2, itemWidth: 10, itemHeight: 10 },
-    series: [{
-      name: '校园卡状态',
-      type: 'pie',
-      radius: ['50%', '70%'],
-      center: ['50%', '43%'],
-      avoidLabelOverlap: true,
-      data: rows,
-      itemStyle: { borderColor: '#fff', borderWidth: 3 },
-      label: { formatter: '{b}\n{c}张' }
-    }]
-  })
-}
-
-const initBusinessChart = () => {
-  businessChart = resetChart(businessChart, businessChartRef)
-  if (!businessChart) return
-
-  const rows = [
-    { name: '消费', value: toNumber(overviewData.value.consumeCount) },
-    { name: '充值', value: toNumber(overviewData.value.rechargeCount) },
-    { name: '借阅', value: toNumber(overviewData.value.borrowCount) },
-    { name: '考勤', value: toNumber(overviewData.value.attendanceCount) },
-    { name: '门禁', value: toNumber(overviewData.value.accessCount) },
-    { name: '通勤', value: toNumber(overviewData.value.commuteRideCount) }
-  ]
-
-  businessChart.setOption({
-    color: ['#409eff'],
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { top: 26, left: 40, right: 20, bottom: 34 },
-    xAxis: {
-      type: 'category',
-      data: rows.map(item => item.name),
-      axisTick: { show: false },
-      axisLine: { lineStyle: { color: '#dcdfe6' } }
-    },
-    yAxis: {
-      type: 'value',
-      axisLine: { show: false },
-      splitLine: { lineStyle: { color: '#eef1f6' } }
-    },
-    series: [{
-      name: '业务量',
-      type: 'bar',
-      barWidth: 28,
-      data: rows.map(item => item.value),
-      itemStyle: {
-        borderRadius: [8, 8, 0, 0],
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#409eff' },
-          { offset: 1, color: '#67c23a' }
-        ])
-      },
-      label: { show: true, position: 'top', color: '#606266' }
-    }]
-  })
-}
-
-const initCharts = async () => {
-  await nextTick()
-  initConsumeChart()
-  initCardStatusChart()
-  initBusinessChart()
 }
 
 const loadUserInfo = () => {
@@ -494,10 +357,9 @@ const reloadDashboard = async () => {
   try {
     loading.value = true
     const params = rangeParams()
-    const [dashboardRes, overviewRes, consumeRes, libraryRes] = await Promise.allSettled([
+    const [dashboardRes, overviewRes, libraryRes] = await Promise.allSettled([
       getDashboardData(),
       getOverview(params),
-      getConsumeStat(params),
       getLibraryOverdueStat(params)
     ])
 
@@ -507,45 +369,25 @@ const reloadDashboard = async () => {
     if (overviewRes.status === 'fulfilled' && overviewRes.value.code === 0) {
       overviewData.value = overviewRes.value.data || {}
     }
-    if (consumeRes.status === 'fulfilled' && consumeRes.value.code === 0) {
-      consumeTrendData.value = consumeRes.value.data || []
-    }
     if (libraryRes.status === 'fulfilled' && libraryRes.value.code === 0) {
       libraryData.value = libraryRes.value.data || {}
     }
-
-    await initCharts()
   } catch (error) {
     console.error('加载首页数据失败:', error)
-    await initCharts()
   } finally {
     loading.value = false
   }
 }
 
-const handleResize = () => {
-  ;[consumeChart, cardStatusChart, businessChart].forEach(chart => {
-    if (chart) chart.resize()
-  })
-}
-
 onMounted(() => {
   loadUserInfo()
   reloadDashboard()
-  window.addEventListener('resize', handleResize)
-})
-
-onBeforeUnmount(() => {
-  ;[consumeChart, cardStatusChart, businessChart].forEach(chart => {
-    if (chart) chart.dispose()
-  })
-  window.removeEventListener('resize', handleResize)
 })
 </script>
 
 <style scoped>
 .home-container {
-  padding: 20px;
+  padding: 0;
   color: #1f2937;
 }
 
@@ -557,12 +399,12 @@ onBeforeUnmount(() => {
   overflow: hidden;
   min-height: 210px;
   padding: 26px;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
+  border: 1px solid #cfe9e5;
+  border-radius: 16px;
   background:
     radial-gradient(circle at 82% 18%, rgba(45, 212, 191, 0.26), transparent 30%),
-    linear-gradient(135deg, #f8fbff 0%, #eef6ff 48%, #f6fbf4 100%);
-  box-shadow: 0 16px 34px rgba(31, 78, 121, 0.08);
+    linear-gradient(135deg, #f8fbfa 0%, #eef8f5 48%, #fff8ec 100%);
+  box-shadow: 0 18px 38px rgba(17, 76, 74, 0.08);
 }
 
 .hero-panel::after {
@@ -571,7 +413,7 @@ onBeforeUnmount(() => {
   bottom: -110px;
   width: 280px;
   height: 280px;
-  border: 42px solid rgba(64, 158, 255, 0.12);
+  border: 42px solid rgba(15, 118, 110, 0.12);
   border-radius: 50%;
   content: '';
 }
@@ -587,7 +429,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 14px;
-  color: #2563eb;
+  color: #0f766e;
   font-size: 13px;
   font-weight: 600;
 }
@@ -620,9 +462,9 @@ onBeforeUnmount(() => {
   align-self: stretch;
   padding: 22px;
   border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 8px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 12px 24px rgba(31, 78, 121, 0.08);
+  box-shadow: 0 12px 24px rgba(17, 76, 74, 0.08);
 }
 
 .summary-label,
@@ -651,7 +493,7 @@ onBeforeUnmount(() => {
 }
 
 .metric-grid,
-.dashboard-row {
+.workbench-row {
   margin-top: 18px;
 }
 
@@ -666,15 +508,15 @@ onBeforeUnmount(() => {
   height: 116px;
   padding: 18px;
   border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #fff;
   box-shadow: 0 8px 22px rgba(25, 35, 55, 0.04);
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
 .metric-card:hover {
-  border-color: #b7d9ff;
-  box-shadow: 0 14px 28px rgba(64, 158, 255, 0.12);
+  border-color: #b9e4dd;
+  box-shadow: 0 14px 28px rgba(15, 118, 110, 0.12);
   transform: translateY(-2px);
 }
 
@@ -690,7 +532,7 @@ onBeforeUnmount(() => {
 .metric-icon {
   width: 46px;
   height: 46px;
-  border-radius: 8px;
+  border-radius: 14px;
   color: #fff;
   font-size: 23px;
 }
@@ -719,7 +561,7 @@ onBeforeUnmount(() => {
 
 .panel-card {
   height: 100%;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .panel-header {
@@ -742,15 +584,6 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-.chart-box {
-  width: 100%;
-  height: 330px;
-}
-
-.chart-box.compact {
-  height: 330px;
-}
-
 .alert-list {
   display: grid;
   gap: 12px;
@@ -763,14 +596,14 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 13px 14px;
   border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #f8fafc;
 }
 
 .alert-icon {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: 12px;
   color: #fff;
   font-size: 19px;
 }
@@ -808,6 +641,57 @@ onBeforeUnmount(() => {
   background: #409eff;
 }
 
+.activity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.activity-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 96px;
+  padding: 15px;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.activity-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 20px;
+}
+
+.activity-copy {
+  min-width: 0;
+}
+
+.activity-copy span,
+.activity-copy em {
+  display: block;
+  color: #6b7280;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.activity-copy strong {
+  display: block;
+  margin: 4px 0;
+  color: #111827;
+  font-size: 22px;
+  line-height: 1.22;
+  font-weight: 800;
+  word-break: break-all;
+}
+
 .quick-panel {
   margin-top: 18px;
 }
@@ -827,7 +711,7 @@ onBeforeUnmount(() => {
   min-height: 68px;
   padding: 13px 14px;
   border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border-radius: 12px;
   color: #1f2937;
   background: #fff;
   cursor: pointer;
@@ -836,63 +720,89 @@ onBeforeUnmount(() => {
 }
 
 .quick-action:hover {
-  border-color: #b7d9ff;
-  background: #f8fbff;
+  border-color: #b9e4dd;
+  background: #f8fbfa;
   transform: translateY(-1px);
 }
 
 .quick-action > span:nth-child(2) {
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.quick-action strong,
+.quick-action em {
+  display: block;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.quick-action strong {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.quick-action em {
+  margin-top: 4px;
+  color: #8a95a3;
+  font-size: 12px;
+  font-style: normal;
 }
 
 .quick-icon {
   width: 38px;
   height: 38px;
-  border-radius: 8px;
+  border-radius: 12px;
   color: #fff;
   font-size: 19px;
 }
 
 .tone-blue .metric-icon,
+.tone-blue .activity-icon,
 .quick-icon.tone-blue {
   background: #409eff;
 }
 
 .tone-green .metric-icon,
+.tone-green .activity-icon,
 .quick-icon.tone-green {
   background: #67c23a;
 }
 
 .tone-orange .metric-icon,
+.tone-orange .activity-icon,
 .quick-icon.tone-orange {
   background: #e6a23c;
 }
 
 .tone-purple .metric-icon,
+.tone-purple .activity-icon,
 .quick-icon.tone-purple {
   background: #8b5cf6;
 }
 
 .tone-cyan .metric-icon,
+.tone-cyan .activity-icon,
 .quick-icon.tone-cyan {
   background: #06b6d4;
 }
 
 .tone-red .metric-icon,
+.tone-red .activity-icon,
 .quick-icon.tone-red {
   background: #f56c6c;
 }
 
 .tone-teal .metric-icon,
+.tone-teal .activity-icon,
 .quick-icon.tone-teal {
   background: #14b8a6;
 }
 
 .tone-indigo .metric-icon,
+.tone-indigo .activity-icon,
 .quick-icon.tone-indigo {
   background: #6366f1;
 }
@@ -903,6 +813,22 @@ onBeforeUnmount(() => {
 
 :deep(.el-card__body) {
   padding: 18px;
+}
+
+:deep(.hero-actions .el-button--primary) {
+  background: linear-gradient(135deg, #0b4f4a, #0f766e);
+  border-color: #0f766e;
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.18);
+}
+
+:deep(.hero-actions .el-button--primary:hover),
+:deep(.hero-actions .el-button--primary:focus) {
+  background: linear-gradient(135deg, #0a4744, #0d665f);
+  border-color: #0d665f;
+}
+
+:deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #0f766e, #14b8a6);
 }
 
 @media (max-width: 1200px) {
@@ -916,14 +842,14 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .dashboard-row .el-col + .el-col {
+  .workbench-row .el-col + .el-col {
     margin-top: 18px;
   }
 }
 
 @media (max-width: 768px) {
   .home-container {
-    padding: 12px;
+    padding: 0;
   }
 
   .hero-panel {
@@ -941,14 +867,13 @@ onBeforeUnmount(() => {
   .quick-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .chart-box,
-  .chart-box.compact {
-    height: 300px;
-  }
 }
 
 @media (max-width: 480px) {
+  .activity-grid {
+    grid-template-columns: 1fr;
+  }
+
   .metric-card {
     align-items: flex-start;
     height: auto;

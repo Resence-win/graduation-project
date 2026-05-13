@@ -15,6 +15,10 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 
 app.use(pinia)
 app.use(router)
-app.use(ElementPlus)
+app.use(ElementPlus, {
+  table: {
+    showOverflowTooltip: true
+  }
+})
 
 app.mount('#app')

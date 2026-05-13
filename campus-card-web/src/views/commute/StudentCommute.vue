@@ -9,7 +9,7 @@
       </template>
 
       <el-alert
-        v-if="!studentProfileComplete"
+        v-if="requiresStudentProfile && !studentProfileComplete"
         :title="studentProfileIncompleteMessage"
         type="warning"
         show-icon
@@ -96,9 +96,9 @@
         </el-table>
       </div>
       
-      <!-- 校园卡扫码上车 -->
+      <!-- 通勤车上车登记 -->
       <div class="section">
-        <h3>校园卡扫码上车</h3>
+        <h3>通勤车上车登记</h3>
         <el-card shadow="hover" style="max-width: 400px; margin: 0 auto">
           <div class="scan-container">
             <el-form :model="scanForm" label-width="80px">
@@ -133,10 +133,18 @@
                 </el-select>
               </el-form-item>
             </el-form>
-            <el-button type="primary" :disabled="!studentProfileComplete" @click="handleScanQRCode" style="margin-top: 20px">扫码上车</el-button>
+            <el-button
+              type="primary"
+              :disabled="requiresStudentProfile && !studentProfileComplete"
+              :loading="boardingLoading"
+              @click="handleBoardCommute"
+              style="margin-top: 20px"
+            >
+              上车
+            </el-button>
             <div v-if="scanResult" class="scan-result">
               <el-alert
-                :title="scanResult.success ? '扫码成功' : '扫码失败'"
+                :title="scanResult.success ? '上车成功' : '上车失败'"
                 :type="scanResult.success ? 'success' : 'error'"
                 show-icon
               />
@@ -145,7 +153,7 @@
                 车辆：{{ scanResult.vehiclePlateNumber }}<br>
                 班次：{{ scanResult.scheduleTime }}<br>
                 座位号：{{ scanResult.seatNumber }}<br>
-                扫码时间：{{ scanResult.scanTime }}
+                登记时间：{{ scanResult.boardingTime }}
               </p>
               <p v-else>{{ scanResult.message }}</p>
             </div>
@@ -226,6 +234,35 @@
         </span>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="boardingDialogVisible"
+      title="上车登记"
+      width="520px"
+      :close-on-click-modal="!boardingLoading"
+      :close-on-press-escape="!boardingLoading"
+      :show-close="!boardingLoading"
+    >
+      <div class="boarding-dialog">
+        <el-steps :active="boardingActiveStep" finish-status="success" align-center>
+          <el-step
+            v-for="step in boardingSteps"
+            :key="step"
+            :title="step"
+          />
+        </el-steps>
+        <div class="boarding-step-tip">
+          <span v-if="boardingLoading">{{ boardingSteps[boardingActiveStep] }}...</span>
+          <span v-else-if="scanResult?.success">上车登记完成，座位号 {{ scanResult.seatNumber }}</span>
+          <span v-else-if="scanResult">登记失败：{{ scanResult.message }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button :disabled="boardingLoading" @click="boardingDialogVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -238,7 +275,7 @@ import {
   getCommuteList,
   getVehicleList,
   getStationList,
-  addCommuteRecord
+  boardCommute
 } from '@/api/commute'
 import { getStudentByNo } from '@/api/student'
 
@@ -261,9 +298,15 @@ const stationList = ref([])
 
 const activeRouteList = computed(() => routeList.value.filter(route => route.status === 1))
 const activeVehicleList = computed(() => vehicleList.value.filter(vehicle => vehicle.status === 1))
+const currentUser = computed(() => getCurrentUser())
+const userRole = computed(() => currentUser.value?.role || '')
+const requiresStudentProfile = computed(() => userRole.value === 'student')
 const studentInfo = ref(null)
 const studentProfileIncompleteMessage = '请先在个人中心完善姓名、性别、学院、专业、班级、手机号后再进行该操作'
 const studentProfileComplete = computed(() => {
+  if (!requiresStudentProfile.value) {
+    return true
+  }
   if (!studentInfo.value) {
     return false
   }
@@ -278,10 +321,10 @@ const recordPagination = reactive({
   total: 0
 })
 
-// 扫码结果
+// 上车结果
 const scanResult = ref(null)
 
-// 扫码上车选择
+// 上车登记选择
 const scanForm = reactive({
   routeId: null,
   vehicleId: null,
@@ -338,6 +381,11 @@ const currentLocation = ref(null)
 const stationDialogVisible = ref(false)
 const selectedRouteStations = ref([])
 const selectedStationRouteName = ref('')
+const boardingDialogVisible = ref(false)
+const boardingLoading = ref(false)
+const boardingActiveStep = ref(0)
+const boardingSteps = ['读取校园卡', '校验班次', '分配座位', '登记成功']
+const boardingStepDelay = 350
 
 // 加载线路列表
 const loadRouteList = async () => {
@@ -374,8 +422,11 @@ const loadVehicleList = async () => {
 
 const loadStudentInfo = async () => {
   try {
-    const userStr = localStorage.getItem('user')
-    const user = userStr ? JSON.parse(userStr) : null
+    const user = getCurrentUser()
+    if (user?.role !== 'student') {
+      studentInfo.value = null
+      return
+    }
     if (!user?.username) return
     const res = await getStudentByNo(user.username)
     if (res.code === 0) {
@@ -695,11 +746,10 @@ const calculateArrivalTimeToEndStation = (routeId) => {
   return calculateArrivalTime(currentLocation.value, { latitude: endStation.latitude, longitude: endStation.longitude })
 }
 
-// 获取学生的卡ID
-const getStudentCardId = () => {
+// 获取当前用户的校园卡ID
+const getCurrentUserCardId = () => {
   try {
-    const userStr = localStorage.getItem('user')
-    const user = userStr ? JSON.parse(userStr) : null
+    const user = getCurrentUser()
     
     if (user && user.cardId) {
       return user.cardId
@@ -712,10 +762,22 @@ const getStudentCardId = () => {
   }
 }
 
-// 扫码上车
-const handleScanQRCode = async () => {
+const getCurrentUser = () => {
+  const userStr = localStorage.getItem('user')
+  return userStr ? JSON.parse(userStr) : null
+}
+
+const wait = (delay) => new Promise(resolve => setTimeout(resolve, delay))
+
+const updateBoardingStep = async (step) => {
+  boardingActiveStep.value = step
+  await wait(boardingStepDelay)
+}
+
+// 点击上车
+const handleBoardCommute = async () => {
   try {
-    if (!studentProfileComplete.value) {
+    if (requiresStudentProfile.value && !studentProfileComplete.value) {
       ElMessage.warning(studentProfileIncompleteMessage)
       return
     }
@@ -732,31 +794,37 @@ const handleScanQRCode = async () => {
       ElMessage.error('请选择班次')
       return
     }
-    
+
     const vehicle = vehicleList.value.find(v => v.id === scanForm.vehicleId)
-    const seatCount = vehicle?.seatCount || 30
-    const seatNumber = Math.floor(Math.random() * seatCount) + 1
-    
-    // 获取学生的卡ID
-    const cardId = getStudentCardId()
+
+    // 获取当前用户的校园卡ID
+    const cardId = getCurrentUserCardId()
     if (!cardId) {
       ElMessage.error('未获取到校园卡信息，请重新登录或先完成开卡')
       return
     }
-    
-    // 调用后端接口记录乘车记录
+
+    boardingDialogVisible.value = true
+    boardingLoading.value = true
+    boardingActiveStep.value = 0
+    scanResult.value = null
+    await updateBoardingStep(0)
+    await updateBoardingStep(1)
+    await updateBoardingStep(2)
+
+    // 调用后端接口完成上车登记，由服务端自动分配座位
     const recordData = {
       cardId: cardId,
       routeId: scanForm.routeId,
       vehicleId: scanForm.vehicleId,
-      scheduleId: scanForm.scheduleId,
-      seatNumber: seatNumber
+      scheduleId: scanForm.scheduleId
     }
-    
-    const res = await addCommuteRecord(recordData)
-    
+
+    const res = await boardCommute(recordData)
+
     if (res.code === 0) {
-      // 显示扫码结果
+      boardingActiveStep.value = 3
+      const boardingData = res.data || {}
       const route = routeList.value.find(r => r.id === scanForm.routeId)
       const schedule = scheduleList.value.find(s => s.id === scanForm.scheduleId)
       scanResult.value = {
@@ -764,10 +832,10 @@ const handleScanQRCode = async () => {
         routeName: route ? route.routeName : '未知线路',
         vehiclePlateNumber: vehicle ? vehicle.plateNumber : '未知车辆',
         scheduleTime: schedule ? schedule.departureTime : '未知班次',
-        seatNumber: seatNumber,
-        scanTime: new Date().toLocaleString()
+        seatNumber: boardingData.seatNumber || '--',
+        boardingTime: boardingData.rideTime ? new Date(boardingData.rideTime).toLocaleString() : new Date().toLocaleString()
       }
-      
+
       // 重新加载车辆和班次列表
       await loadVehicleList()
       if (scanForm.routeId) {
@@ -777,23 +845,20 @@ const handleScanQRCode = async () => {
       
       // 重新加载乘车记录
       await loadMyRecordData()
-      
-      // 3秒后清除扫码结果
-      setTimeout(() => {
-        scanResult.value = null
-      }, 3000)
     } else {
       scanResult.value = {
         success: false,
-        message: res.msg || '扫码失败，请重试'
+        message: res.msg || '上车失败，请重试'
       }
     }
   } catch (error) {
-    console.error('扫码失败:', error)
+    console.error('上车失败:', error)
     scanResult.value = {
       success: false,
-      message: error.message || '扫码失败，请检查网络连接'
+      message: error.message || '上车失败，请检查网络连接'
     }
+  } finally {
+    boardingLoading.value = false
   }
 }
 
@@ -863,5 +928,16 @@ onMounted(async () => {
 .scan-result p {
   margin: 10px 0;
   line-height: 1.5;
+}
+
+.boarding-dialog {
+  padding: 8px 0 4px;
+}
+
+.boarding-step-tip {
+  margin-top: 24px;
+  min-height: 24px;
+  text-align: center;
+  color: #606266;
 }
 </style>

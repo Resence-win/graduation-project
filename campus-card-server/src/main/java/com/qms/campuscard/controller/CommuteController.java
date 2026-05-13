@@ -3,6 +3,8 @@ package com.qms.campuscard.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.qms.campuscard.common.LogUtil;
 import com.qms.campuscard.common.Result;
+import com.qms.campuscard.dto.CommuteBoardingRequest;
+import com.qms.campuscard.dto.CommuteBoardingResponse;
 import com.qms.campuscard.entity.CommuteRoute;
 import com.qms.campuscard.entity.CommuteVehicle;
 import com.qms.campuscard.entity.CommuteStation;
@@ -314,5 +316,15 @@ public class CommuteController {
         } else {
             return Result.error("新增乘车记录失败");
         }
+    }
+
+    /**
+     * 上车登记接口：学生点击上车后校验班次并自动分配座位，生成通勤乘车记录。
+     */
+    @PostMapping("/boarding")
+    public Result<CommuteBoardingResponse> boardCommute(@RequestBody CommuteBoardingRequest request) {
+        CommuteBoardingResponse response = commuteRecordService.boardCommute(request);
+        logUtil.recordLog(1L, "新增", "commute_record", response.getRecordId(), "上车登记：卡ID" + request.getCardId());
+        return Result.success("上车登记成功", response);
     }
 }

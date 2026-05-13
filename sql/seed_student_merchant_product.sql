@@ -4,7 +4,7 @@
 -- 使用说明：
 -- 1. 请先执行 init.sql。
 -- 2. 商品数据依赖 product 表，请先执行 sql/product_consume_upgrade.sql。
--- 3. 图片文件已放在 campus-card-server/upload/seed/ 下，后端从 campus-card-server 启动时可通过 /api/upload/seed/... 访问。
+-- 3. 图片文件已放在项目根目录 upload/seed/ 下，后端从 campus-card-server 启动时可通过 /api/upload/seed/... 访问。
 
 SET search_path TO campus_card;
 

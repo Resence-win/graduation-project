@@ -2,6 +2,7 @@ package com.qms.campuscard.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.qms.campuscard.entity.AccessRecord;
+import com.qms.campuscard.entity.AttendanceLocation;
 import com.qms.campuscard.entity.AttendanceRecord;
 import com.qms.campuscard.entity.Book;
 import com.qms.campuscard.entity.BorrowRecord;
@@ -14,6 +15,7 @@ import com.qms.campuscard.entity.RechargeRecord;
 import com.qms.campuscard.entity.Student;
 import com.qms.campuscard.entity.Teacher;
 import com.qms.campuscard.mapper.AccessRecordMapper;
+import com.qms.campuscard.mapper.AttendanceLocationMapper;
 import com.qms.campuscard.mapper.AttendanceRecordMapper;
 import com.qms.campuscard.mapper.BookMapper;
 import com.qms.campuscard.mapper.BorrowRecordMapper;
@@ -44,6 +46,8 @@ import java.util.Map;
 @Service
 public class StatisticsServiceImpl implements StatisticsService {
 
+    private static final String STATISTIC_LOCATION_EXPIRED_MESSAGE = "该考勤点已过期超过1个月，暂不支持统计查看";
+
     @Resource
     private ConsumeRecordMapper consumeRecordMapper;
 
@@ -73,6 +77,9 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private AttendanceRecordMapper attendanceRecordMapper;
+
+    @Resource
+    private AttendanceLocationMapper attendanceLocationMapper;
 
     @Resource
     private AccessRecordMapper accessRecordMapper;
@@ -300,7 +307,9 @@ public class StatisticsServiceImpl implements StatisticsService {
     }
 
     @Override
-    public Map<String, Object> getWeeklyAttendanceStatistics(String startDateText, String endDateText) {
+    public Map<String, Object> getWeeklyAttendanceStatistics(String startDateText, String endDateText, Long locationId) {
+        validateStatisticLocationWithinRange(locationId);
+
         LocalDate endDate = StringUtils.hasText(endDateText) ? LocalDate.parse(endDateText) : LocalDate.now();
         LocalDate startDate = StringUtils.hasText(startDateText) ? LocalDate.parse(startDateText) : endDate.minusDays(6);
         if (startDate.isAfter(endDate)) {
@@ -311,14 +320,24 @@ public class StatisticsServiceImpl implements StatisticsService {
         LocalDateTime startTime = startDate.atStartOfDay();
         LocalDateTime endTime = endDate.atTime(LocalTime.MAX);
 
+        List<Object> params = new ArrayList<>();
+        params.add(startTime);
+        params.add(endTime);
+        String locationCondition = "";
+        if (locationId != null) {
+            locationCondition = "AND location_id = ? ";
+            params.add(locationId);
+        }
+
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT TO_CHAR(record_time, 'YYYY-MM-DD') AS date, status, COUNT(*) AS count " +
                         "FROM attendance_record " +
                         "WHERE is_deleted = 0 AND record_time >= ? AND record_time <= ? " +
+                        locationCondition +
                         "AND status IN ('正常', '迟到', '早退', '缺勤') " +
                         "GROUP BY TO_CHAR(record_time, 'YYYY-MM-DD'), status " +
                         "ORDER BY date",
-                startTime, endTime);
+                params.toArray());
 
         Map<String, Map<String, Object>> dailyMap = new LinkedHashMap<>();
         for (LocalDate dateItem = startDate; !dateItem.isAfter(endDate); dateItem = dateItem.plusDays(1)) {
@@ -356,6 +375,22 @@ public class StatisticsServiceImpl implements StatisticsService {
         data.put("endDate", endDate.toString());
         data.put("daily", new ArrayList<>(dailyMap.values()));
         return data;
+    }
+
+    private void validateStatisticLocationWithinRange(Long locationId) {
+        if (locationId == null) {
+            return;
+        }
+        AttendanceLocation location = attendanceLocationMapper.selectById(locationId);
+        if (location == null) {
+            throw new RuntimeException("打卡位置不存在");
+        }
+        if (location.getEndTime() == null) {
+            throw new RuntimeException("打卡位置未配置结束时间，暂不支持统计查看");
+        }
+        if (location.getEndTime().isBefore(LocalDateTime.now().minusMonths(1))) {
+            throw new RuntimeException(STATISTIC_LOCATION_EXPIRED_MESSAGE);
+        }
     }
 
     @Override
